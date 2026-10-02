@@ -10,10 +10,10 @@ from __future__ import annotations
 import json
 import os
 
-from calibrated_rag import data
-from calibrated_rag.retriever import HybridRetriever, TfidfRetriever
+from helpdesk_agent import data
+from helpdesk_agent.retriever import HybridRetriever, TfidfRetriever
 
-RESULTS = os.path.join(os.path.dirname(__file__), "results")
+RESULTS = os.path.join(os.path.dirname(__file__), "results", "squad")
 
 
 def recall_at(retriever, items, k):

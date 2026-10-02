@@ -11,7 +11,7 @@ import json
 import os
 import urllib.request
 
-MODEL = os.environ.get("CRAG_EMBED_MODEL", "gemini-embedding-001")
+MODEL = os.environ.get("HDA_EMBED_MODEL", "gemini-embedding-001")
 _ENDPOINT = ("https://generativelanguage.googleapis.com/v1beta/models/"
              "{model}:embedContent?key={key}")
 _CACHE_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "embed_cache.json")

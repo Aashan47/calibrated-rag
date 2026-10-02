@@ -1,0 +1,3 @@
+# Cancelling your subscription
+
+The workspace Owner can cancel under Settings › Billing › Cancel plan. The workspace stays fully active until the end of the paid period, after which it drops to the Free plan if it has 5 or fewer members, or becomes read-only if it has more. Your data is retained for 90 days after the paid period ends; you can reactivate the subscription at any time in that window and nothing is lost. After 90 days the workspace and its data are permanently deleted and cannot be recovered. Cancelling does not trigger a refund automatically; see the refund policy for what is eligible.

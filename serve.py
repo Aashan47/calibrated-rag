@@ -1,76 +1,74 @@
-"""A zero-dependency web interface for the agent.
+"""The support console: a zero-dependency web app around the agent.
 
     GEMINI_API_KEY=... python serve.py           # then open http://localhost:8000
 
-Pure Python standard library — no web framework. The UI (calibrated_rag/ui/index.html) shows
-the knowledge base the agent answers from, the answer or abstention with its reason, the
-confidence against the calibrated threshold, the cited passage, and the agent's full trace.
+Pure Python standard library, no web framework. The UI (helpdesk_agent/ui/index.html) is a
+support console: the help centre the agent replies from, an incoming-ticket box, and for each
+ticket either a cited reply draft or an escalation with a hand-off note for the human agent,
+plus the confidence against the calibrated threshold and the agent's full trace.
 
 Endpoints
-    GET  /          the interface
-    GET  /meta      model, retriever, threshold (and where it came from), calibration stats
-    GET  /corpus    every passage the agent can answer from (id, title, text, source)
-    POST /ask       {"question"} -> answered / abstained / error, with citation + trace
-    POST /compare   {"question"} -> what the same model says with no documents at all
+    GET  /           the console
+    GET  /meta       company, model, threshold (and where it came from), calibration stats
+    GET  /articles   every help-centre article the agent can reply from
+    POST /ticket     {"message"} -> resolved / escalated / error, with citation, trace, hand-off
+    POST /compare    {"message"} -> what a generic chatbot (same model, no help centre) replies
+    GET  /health
 """
 
 from __future__ import annotations
 
 import json
 import os
-import re
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-from calibrated_rag import agent as agent_mod
-from calibrated_rag import corpus, llm, trace
+from helpdesk_agent import agent as agent_mod
+from helpdesk_agent import corpus, llm, trace
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-UI = os.path.join(HERE, "calibrated_rag", "ui", "index.html")
-RESULTS = os.path.join(HERE, "results", "results.json")
-REPO = "https://github.com/Aashan47/calibrated-rag-agent"
+UI = os.path.join(HERE, "helpdesk_agent", "ui", "index.html")
+RESULTS = os.path.join(HERE, "results", "helpdesk", "results.json")
+REPO = "https://github.com/Aashan47/helpdesk-agent"
 
-print("Loading corpus + agent...")
+print("Loading help centre + agent...")
 _C = corpus.load_corpus()
-_CONTEXTS, _SOURCE, _CUSTOM, _SOURCES = _C["contexts"], _C["name"], _C["is_custom"], _C["sources"]
+_CONTEXTS, _ARTICLES, _CUSTOM = _C["contexts"], _C["articles"], _C["is_custom"]
 _AGENT = agent_mod.Agent(_CONTEXTS)
 _TAU = corpus.abstention_threshold(_CUSTOM)
-print(f"Ready: {len(_CONTEXTS)} passages from {_SOURCE}; abstention threshold = {_TAU:.2f}; "
+print(f"Ready: {len(_CONTEXTS)} articles from {_C['name']}; escalation threshold = {_TAU:.2f}; "
       f"retrieval = {_AGENT.retrieval_mode}; samples = {_AGENT.n}")
 
+_ART = [{"id": i, **a, "words": len(_CONTEXTS[i].split()), "text": _CONTEXTS[i]}
+        for i, a in enumerate(_ARTICLES)]
 
-# ---- corpus presentation -------------------------------------------------------------
-def _title(text: str, i: int) -> str:
-    """A short label for a passage: its source file if ingested, else its opening clause."""
-    if _SOURCES and i < len(_SOURCES) and _SOURCES[i]:
-        return _SOURCES[i]
-    first = re.split(r"(?<=[.!?])\s", text.strip(), maxsplit=1)[0]
-    first = re.sub(r"\[[^\]]*\]", "", first).strip()
-    return (first[:72].rsplit(" ", 1)[0] + "…") if len(first) > 72 else first
-
-
-_PASSAGES = [{"id": i, "title": _title(t, i), "text": t, "words": len(t.split()),
-              "source": (_SOURCES[i] if _SOURCES and i < len(_SOURCES) else None)}
-             for i, t in enumerate(_CONTEXTS)]
-
-# Example questions for the committed demo corpus (answers verifiably in / not in it).
+# Example tickets for the committed Northwind help centre (verifiably in / not in it).
 _EXAMPLES = None if _CUSTOM else {
-    "answerable": ["Who was Yersinia pestis named for?",
-                   "What is the tallest building in Jacksonville?",
-                   "What is Warsaw's symbol?",
-                   "When did Sky announce Sky Q?"],
-    "unanswerable": ["What year did Alexandre Yersin die?",
-                     "What is the capital of Mars?",
-                     "Who won the 2050 World Cup?"],
+    "resolvable": [
+        "I bought the annual plan 10 days ago and changed my mind. Can I get my money back?",
+        "Can we pay by bank transfer instead of card?",
+        "I deleted a project by accident last week. Is it gone for good?",
+        "Does the Team plan include phone support?",
+    ],
+    "escalate": [
+        "Do you offer a self-hosted / on-premise version?",
+        "Can I be invoiced in euros?",
+        "We're an early-stage startup, is there a discount for us?",
+    ],
+    "tricky": [
+        "I'm on the Free plan and want Slack notifications in three channels. Possible?",
+        "Our workspace is in the US. Can you move it to the EU region for GDPR?",
+        "My export link stopped working after about ten days, can you resend it?",
+    ],
 }
 
 
 def _threshold_source() -> str:
-    if os.environ.get("CRAG_THRESHOLD"):
-        return "set by CRAG_THRESHOLD (deployment override)"
+    if os.environ.get("HDA_THRESHOLD"):
+        return "set by HDA_THRESHOLD (deployment override)"
     if _CUSTOM:
-        return "default for an uncalibrated custom corpus (≥ 3 of 5 samples agree)"
-    return "calibrated on SQuAD 2.0 with split-conformal selective prediction"
+        return "default for an uncalibrated corpus (at least 3 of 5 samples agree)"
+    return "calibrated on 68 labelled Northwind tickets (split-conformal selective prediction)"
 
 
 def _calibration() -> dict | None:
@@ -78,63 +76,97 @@ def _calibration() -> dict | None:
         return None
     try:
         r = json.load(open(RESULTS))
+        c = r["calibrated_abstention"]
         return {"alpha": r["alpha_target_error"], "ece": r["ece"],
                 "selective_error": r["test_selective_error_at_threshold"],
                 "guarantee_held": r["guarantee_held"], "dataset": r["dataset"],
-                "n": r["n_questions"], "calibrated_threshold": r["calibrated_threshold"]}
+                "n": r["n_questions"], "n_test": r.get("n_test"),
+                "n_unanswerable": r["n_unanswerable"],
+                "calibrated_threshold": r["calibrated_threshold"],
+                "coverage": c["coverage"], "selective_accuracy": c["selective_accuracy"],
+                "hallucination": c["hallucination_rate_unanswerable"],
+                "task_accuracy": c["task_accuracy"],
+                "naive_hallucination": r["naive_always_answer"]["hallucination_rate_unanswerable"],
+                "trust_hallucination": r["uncalibrated_trust_model"]["hallucination_rate_unanswerable"]}
     except Exception:  # noqa: BLE001
         return None
 
 
 def _meta() -> dict:
-    return {"name": "calibrated-rag-agent", "repo": REPO,
-            "n": len(_CONTEXTS), "source": _SOURCE, "is_custom": _CUSTOM,
+    cats: dict[str, str] = {}
+    for a in _ARTICLES:
+        cats.setdefault(a["category"], a["category_name"])
+    return {"name": "helpdesk-agent", "repo": REPO, "company": _C["company"],
+            "kb_name": _C["name"], "n_articles": len(_CONTEXTS), "categories": cats,
+            "is_custom": _CUSTOM,
             "threshold": round(_TAU, 3), "threshold_source": _threshold_source(),
-            "model": os.environ.get("CRAG_MODEL", "gemini-2.5-flash"),
+            "model": os.environ.get("HDA_MODEL", "gemini-2.5-flash"),
             "model_key": bool(os.environ.get("GEMINI_API_KEY") or os.environ.get("GEMENI_API_KEY")),
             "retriever": _AGENT.retrieval_mode, "n_samples": _AGENT.n,
             "max_steps": _AGENT.max_steps, "calibration": _calibration(),
             "examples": _EXAMPLES}
 
 
-# ---- answering -----------------------------------------------------------------------
+# ---- ticket handling ------------------------------------------------------------------
+_TITLES = {"ok": "Resolved from the help centre",
+           "not_in_documents": "Not covered by the help centre",
+           "no_supported_answer": "No article supports a reply",
+           "low_confidence": "Confidence below the calibrated threshold",
+           "model_unavailable": "Model unavailable"}
+
+
 def _explain(pred: dict, d: dict) -> tuple[str, str, str]:
-    """(status, reason_code, reason). Keeps the three outcomes — answered, abstained for a
-    stated reason, model unavailable — strictly apart."""
+    """(status, reason_code, reason) — resolved, escalated for a stated reason, or model
+    unavailable. The three never blur into each other."""
     n, votes = _AGENT.n, pred.get("votes", 0)
     searches = sum(1 for s in pred.get("steps", []) if s.get("action") == "search")
     if pred.get("error"):
         return "error", "model_unavailable", pred["error"]
     if d["answered"]:
-        return ("answered", "ok",
-                f"{votes} of {n} independent samples found an answer in the passages and "
-                f"{pred['confidence']:.2f} of them agreed on this one, above the {_TAU:.2f} threshold.")
+        return ("resolved", "ok",
+                f"{votes} of {n} independent samples found the answer in the articles and "
+                f"{pred['confidence']:.2f} of them agreed on it, above the {_TAU:.2f} threshold.")
     if any(s.get("action") == "abstain" for s in pred.get("steps", [])):
-        return ("abstained", "not_in_documents",
-                f"after {searches} search{'es' if searches != 1 else ''} the agent judged the answer "
-                f"is not in this knowledge base and stopped before attempting one.")
+        return ("escalated", "not_in_documents",
+                f"after {searches} search{'es' if searches != 1 else ''} the agent judged the "
+                f"help centre does not cover this, and stopped before drafting a reply.")
     if not pred.get("answerable"):
-        return ("abstained", "no_supported_answer",
-                f"the passages were retrieved, but only {votes} of {n} samples found an answer "
+        return ("escalated", "no_supported_answer",
+                f"articles were retrieved, but only {votes} of {n} samples found a reply "
                 f"supported by them (a majority is required).")
-    return ("abstained", "low_confidence",
-            f"{votes} of {n} samples answered, but only {pred['confidence']:.2f} agreed on the same "
-            f"answer, below the calibrated threshold of {_TAU:.2f}.")
+    return ("escalated", "low_confidence",
+            f"{votes} of {n} samples drafted a reply, but only {pred['confidence']:.2f} agreed on "
+            f"the same answer, below the calibrated threshold of {_TAU:.2f}.")
 
 
-_TITLES = {"ok": "Answered", "not_in_documents": "Not in these documents",
-           "no_supported_answer": "No supported answer", "low_confidence": "Confidence too low",
-           "model_unavailable": "Model unavailable"}
+def _handoff(question: str, pred: dict, code: str, reason: str) -> dict:
+    """A deterministic hand-off note for the human agent — built from the trace, no extra
+    model call, so it is always available and never invents anything."""
+    searches = [s["query"] for s in pred.get("steps", []) if s.get("action") == "search"]
+    closest = [{"id": i, "title": _ART[i]["title"], "category": _ART[i]["category_name"]}
+               for i in pred.get("retrieved", [])[:3]]
+    if code == "not_in_documents":
+        action = ("Answer manually. If this comes up again, add an article: the agent will then "
+                  "resolve it automatically.")
+    elif code == "no_supported_answer":
+        action = ("Check the closest articles below; the answer may be implied but not stated. "
+                  "If so, make the article explicit.")
+    else:
+        action = ("The articles partly cover this but the samples disagreed on the exact answer. "
+                  "Read the closest articles and reply; consider clarifying the article.")
+    return {"customer_message": question, "searched": searches, "closest": closest,
+            "reason_title": _TITLES.get(code, code), "reason": reason, "suggested_action": action,
+            "holding_reply": ("Thanks for getting in touch. I've passed this to a teammate who can "
+                              "answer it properly, and you'll hear back from us shortly.")}
 
 
-def _answer(question: str) -> dict:
+def _handle(question: str) -> dict:
     t0 = time.time()
     pred = _AGENT.predict(question)
     d = agent_mod.decide(pred, _TAU)
     status, code, reason = _explain(pred, d)
     steps = list(pred.get("steps", []))
-    if pred.get("votes") is not None and not any(s.get("action") == "abstain" for s in steps) \
-            and pred.get("retrieved"):
+    if pred.get("retrieved") and not any(s.get("action") == "abstain" for s in steps):
         steps.append({"action": "sample", "n": _AGENT.n, "votes": pred.get("votes", 0),
                       "errors": pred.get("errors", 0), "error": pred.get("error")})
     latency = round((time.time() - t0) * 1000)
@@ -143,29 +175,41 @@ def _answer(question: str) -> dict:
                "searches": sum(1 for s in steps if s.get("action") == "search"),
                "latency_ms": latency})
     cite = d.get("citation")
-    return {"status": status, "question": question, "answer": d["answer"],
-            "confidence": round(d["confidence"], 3), "threshold": round(_TAU, 3),
-            "votes": pred.get("votes", 0), "votes_total": _AGENT.n if pred.get("retrieved") else 0,
-            "reason_code": code, "reason_title": _TITLES.get(code, code), "reason": reason,
-            "citation": ({"id": cite["corpus_id"], "title": _PASSAGES[cite["corpus_id"]]["title"],
-                          "text": cite["text"]} if cite else None),
-            "retrieved": pred.get("retrieved", []), "steps": steps,
-            "llm_calls": pred.get("llm_calls", 0), "latency_ms": latency}
+    out = {"status": status, "question": question,
+           "reply": d.get("reply") or d.get("answer", ""), "answer": d.get("answer", ""),
+           "confidence": round(d["confidence"], 3), "threshold": round(_TAU, 3),
+           "votes": pred.get("votes", 0),
+           "votes_total": _AGENT.n if pred.get("retrieved") else 0,
+           "reason_code": code, "reason_title": _TITLES.get(code, code), "reason": reason,
+           "citation": None, "retrieved": pred.get("retrieved", []), "steps": steps,
+           "llm_calls": pred.get("llm_calls", 0), "latency_ms": latency, "handoff": None}
+    if cite:
+        a = _ART[cite["corpus_id"]]
+        out["citation"] = {"id": a["id"], "title": a["title"], "category": a["category_name"],
+                           "text": a["text"]}
+    if status == "escalated":
+        out["handoff"] = _handoff(question, pred, code, reason)
+    return out
 
 
 def _compare(question: str) -> dict:
-    """The same model with no documents and no abstention policy — the thing people compare
-    against. Shown side by side so the difference is concrete rather than claimed."""
+    """The thing people compare against: the same model, told to be a helpful support bot for
+    this company, with no help centre. Shown side by side so the difference is concrete."""
     t0 = time.time()
     try:
-        out = llm.complete("Answer the question concisely, in one or two sentences.\n\n"
-                           f"QUESTION: {question}\nANSWER:", max_tokens=160)
-        return {"answer": out.strip(), "latency_ms": round((time.time() - t0) * 1000)}
+        out = llm.complete(
+            f"You are the customer-support assistant for {_C['company'] or 'our company'}, a "
+            "team-collaboration SaaS product. Reply to the customer's message helpfully in one or "
+            f"two sentences.\n\nCUSTOMER: {question}\nREPLY:", max_tokens=160)
+        reply = out.strip()
+        if reply.upper().startswith("REPLY:"):
+            reply = reply[6:].strip()
+        return {"reply": reply, "latency_ms": round((time.time() - t0) * 1000)}
     except llm.LLMError as exc:
         return {"error": str(exc), "latency_ms": round((time.time() - t0) * 1000)}
 
 
-# ---- http ----------------------------------------------------------------------------
+# ---- http -----------------------------------------------------------------------------
 class Handler(BaseHTTPRequestHandler):
     def _send(self, code, body, ctype="application/json"):
         data = body.encode() if isinstance(body, str) else body
@@ -183,11 +227,10 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(200, f.read(), "text/html; charset=utf-8")
         elif path == "/meta":
             self._send(200, json.dumps(_meta()))
-        elif path == "/corpus":
-            self._send(200, json.dumps({"n": len(_PASSAGES), "source": _SOURCE,
-                                        "passages": _PASSAGES}))
+        elif path == "/articles":
+            self._send(200, json.dumps({"n": len(_ART), "name": _C["name"], "articles": _ART}))
         elif path == "/health":
-            self._send(200, json.dumps({"ok": True, "passages": len(_CONTEXTS)}))
+            self._send(200, json.dumps({"ok": True, "articles": len(_CONTEXTS)}))
         else:
             self._send(404, "{}")
 
@@ -197,11 +240,12 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):  # noqa: N802
         try:
-            q = str(self._body().get("question", "")).strip()[:500]
+            b = self._body()
+            q = str(b.get("message") or b.get("question") or "").strip()[:600]
             if not q:
-                self._send(400, json.dumps({"error": "question is required"}))
-            elif self.path == "/ask":
-                self._send(200, json.dumps(_answer(q)))
+                self._send(400, json.dumps({"error": "message is required"}))
+            elif self.path in ("/ticket", "/ask"):
+                self._send(200, json.dumps(_handle(q)))
             elif self.path == "/compare":
                 self._send(200, json.dumps(_compare(q)))
             else:

@@ -1,7 +1,7 @@
 __pycache__/
 *.pyc
 data/
-results/preds.json
-results/preds_single.json
+results/*/preds.json
+results/*/preds_single.json
 .env
 runs/

@@ -1,0 +1,42 @@
+{
+  "dataset": "helpdesk",
+  "alpha_target_error": 0.1,
+  "single_shot": {
+    "gold_recall": 0.9783,
+    "llm_calls_per_query": 5.0,
+    "calibrated_threshold": 1.0,
+    "trust_model": {
+      "coverage": 0.6829,
+      "selective_accuracy": 0.9643,
+      "hallucination_rate_unanswerable": 0.0,
+      "task_accuracy": 0.9512,
+      "answered": 28
+    },
+    "calibrated": {
+      "coverage": 0.6585,
+      "selective_accuracy": 0.963,
+      "hallucination_rate_unanswerable": 0.0,
+      "task_accuracy": 0.9268,
+      "answered": 27
+    }
+  },
+  "agent_loop": {
+    "gold_recall": 0.9783,
+    "llm_calls_per_query": 4.54,
+    "calibrated_threshold": 0.0,
+    "trust_model": {
+      "coverage": 0.6829,
+      "selective_accuracy": 0.9643,
+      "hallucination_rate_unanswerable": 0.0,
+      "task_accuracy": 0.9512,
+      "answered": 28
+    },
+    "calibrated": {
+      "coverage": 0.6829,
+      "selective_accuracy": 0.9643,
+      "hallucination_rate_unanswerable": 0.0,
+      "task_accuracy": 0.9512,
+      "answered": 28
+    }
+  }
+}

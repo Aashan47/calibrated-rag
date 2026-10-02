@@ -1,18 +1,18 @@
-# Render Blueprint — one-click deploy of the web interface.
+# Render Blueprint — one-click deploy of the support console.
 # New -> Blueprint -> pick this repo -> paste your GEMINI_API_KEY. That's it.
 #
-# The hosted demo runs TF-IDF retrieval (no embedding calls -> instant boot) over the small
-# committed corpus, with a lenient abstention threshold so it answers readily while still
-# abstaining on unanswerable questions.
+# The hosted demo runs lexical retrieval (no embedding calls -> instant boot) over the
+# committed Northwind help centre, with the escalation threshold calibrated on its labelled
+# tickets (results/helpdesk/results.json).
 #
-# Rate limits: each question costs ~1 decision call + CRAG_SAMPLES answer samples. Gemini's
-# free tier allows roughly 10-15 requests/minute for gemini-2.5-flash, so with 5 samples two
-# quick questions can hit HTTP 429. CRAG_SAMPLES=3 keeps a question under that budget; a
-# paid-tier key can go back to 5 (the calibrated setting). When the API does rate-limit, the
-# UI says "model unavailable" explicitly rather than pretending the agent abstained.
+# Rate limits: each ticket costs ~1 decision call + HDA_SAMPLES reply samples. Gemini's free
+# tier allows roughly 10-15 requests/minute for gemini-2.5-flash, so with 5 samples two quick
+# tickets can hit HTTP 429. HDA_SAMPLES=3 keeps a ticket under that budget; a paid-tier key can
+# go back to 5 (the calibrated setting). When the API does rate-limit, the console says
+# "model unavailable" explicitly rather than pretending the agent escalated.
 services:
   - type: web
-    name: calibrated-rag-agent
+    name: helpdesk-agent
     runtime: python
     plan: free
     buildCommand: "echo 'no build step — standard library only'"
@@ -22,11 +22,9 @@ services:
     envVars:
       - key: GEMINI_API_KEY        # set this in the dashboard (secret)
         sync: false
-      - key: CRAG_RETRIEVER        # lexical: no embedding calls, instant boot
+      - key: HDA_RETRIEVER         # lexical: no embedding calls, instant boot
         value: tfidf
-      - key: CRAG_THRESHOLD        # lenient demo threshold (answers readily; still abstains)
-        value: "0.6"
-      - key: CRAG_SAMPLES          # fewer answer samples per question for free-tier keys
+      - key: HDA_SAMPLES           # fewer reply samples per ticket for free-tier keys
         value: "3"
       - key: PYTHON_VERSION
         value: "3.12.6"

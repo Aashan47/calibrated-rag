@@ -10,7 +10,7 @@ API calls and is deterministic. It answers the questions a point accuracy number
   * Calibration — headline metrics on the held-out test split with 95% bootstrap CIs, and a
                   check that the conformal guarantee holds with margin.
 
-    python -m eval.behavior            # writes results/behavior.json
+    python -m eval.behavior [--dataset helpdesk|squad]   # writes results/<dataset>/behavior.json
 """
 
 from __future__ import annotations
@@ -18,15 +18,19 @@ from __future__ import annotations
 import json
 import os
 
-from calibrated_rag import data, metrics
+import argparse
+
+from helpdesk_agent import datasets, metrics
 from eval.stats import bootstrap_ci, fmt_pct, proportion
 
 HERE = os.path.dirname(os.path.dirname(__file__))
 RESULTS = os.path.join(HERE, "results")
 
 
-def _load():
-    contexts, items = data.load()
+def _load(dataset: str):
+    global RESULTS
+    RESULTS = os.path.join(HERE, "results", dataset)
+    contexts, items = datasets.load(dataset)
     preds_path = os.path.join(RESULTS, "preds.json")
     if not os.path.exists(preds_path):
         raise SystemExit("results/preds.json not found — run `python evaluate.py` first.")
@@ -154,10 +158,14 @@ def calibration_with_ci(aligned, tau, alpha):
 
 
 def main():
-    contexts, aligned, res = _load()
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--dataset", default="helpdesk", choices=["helpdesk", "squad"])
+    args = ap.parse_args()
+    contexts, aligned, res = _load(args.dataset)
     tau = float(res["calibrated_threshold"])
     alpha = float(res.get("alpha_target_error", 0.20))
     report = {
+        "dataset": res.get("dataset", args.dataset),
         "n_predictions": len(aligned),
         "calibrated_threshold": tau,
         "behaviour": behaviour(aligned),

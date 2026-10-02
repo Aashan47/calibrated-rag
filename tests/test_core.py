@@ -5,10 +5,10 @@
 
 import unittest
 
-from calibrated_rag import conformal, embeddings, llm, metrics
-from calibrated_rag import agent as agent_mod
-from calibrated_rag.agent import Agent, _aggregate
-from calibrated_rag.retriever import HybridRetriever, TfidfRetriever
+from helpdesk_agent import conformal, embeddings, llm, metrics
+from helpdesk_agent import agent as agent_mod
+from helpdesk_agent.agent import Agent, _aggregate
+from helpdesk_agent.retriever import HybridRetriever, TfidfRetriever
 
 
 class TestRetriever(unittest.TestCase):

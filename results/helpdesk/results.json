@@ -1,0 +1,38 @@
+{
+  "model": "gemini-2.5-flash",
+  "dataset": "Northwind help centre tickets",
+  "n_questions": 68,
+  "n_unanswerable": 22,
+  "n_passages": 30,
+  "retrieval_k": 3,
+  "n_calibration": 27,
+  "n_test": 41,
+  "alpha_target_error": 0.1,
+  "calibrated_threshold": 0.0,
+  "ece": 0.0533,
+  "ece_selfconsistency": 0.0533,
+  "ece_selfreported": 0.0276,
+  "naive_always_answer": {
+    "coverage": 1.0,
+    "selective_accuracy": 0.6585365853658537,
+    "hallucination_rate_unanswerable": 1.0,
+    "task_accuracy": 0.6585365853658537,
+    "answered": 41
+  },
+  "uncalibrated_trust_model": {
+    "coverage": 0.6829268292682927,
+    "selective_accuracy": 0.9642857142857143,
+    "hallucination_rate_unanswerable": 0.0,
+    "task_accuracy": 0.9512195121951219,
+    "answered": 28
+  },
+  "calibrated_abstention": {
+    "coverage": 0.6829268292682927,
+    "selective_accuracy": 0.9642857142857143,
+    "hallucination_rate_unanswerable": 0.0,
+    "task_accuracy": 0.9512195121951219,
+    "answered": 28
+  },
+  "test_selective_error_at_threshold": 0.0357,
+  "guarantee_held": true
+}

@@ -1,0 +1,3 @@
+# Plans and pricing
+
+Northwind Workspace has four plans. Free is for up to 5 members and includes 2 GB of storage, unlimited projects and basic integrations. Team costs $12 per user per month when billed annually, or $15 per user per month billed monthly, and adds guest access, Google Calendar sync and 100 GB of shared storage. Business costs $24 per user per month billed annually ($30 monthly) and adds SAML single sign-on, required two-factor authentication, EU data residency, unlimited storage and the 99.9% uptime SLA. Enterprise is custom-priced and adds SCIM provisioning, 24/7 support, workspace API tokens and custom retention. All prices are in US dollars and exclude tax. You can compare plans at any time under Settings › Billing › Plans.

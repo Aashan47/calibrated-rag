@@ -1,0 +1,65 @@
+{
+  "dataset": "Northwind help centre tickets",
+  "n_predictions": 68,
+  "calibrated_threshold": 0.0,
+  "behaviour": {
+    "queries": 68,
+    "mean_searches_per_query": 1.103,
+    "max_searches": 4,
+    "reformulated_pct": 0.0588,
+    "agent_abstained_pct": 0.3088,
+    "search_count_distribution": {
+      "1": 64,
+      "2": 2,
+      "3": 1,
+      "4": 1
+    }
+  },
+  "retrieval_recovery": {
+    "answerable_questions": 46,
+    "seed_recall": 0.9783,
+    "final_recall": 0.9783,
+    "seed_misses": 1,
+    "recovered_by_reformulation": 0,
+    "recovery_rate_on_misses": 0.0
+  },
+  "groundedness": {
+    "answered_correct": 43,
+    "citation_present_pct": 1.0,
+    "citation_is_gold_passage_pct": 1.0
+  },
+  "calibration_test_split": {
+    "test_n": 41,
+    "selective_accuracy": {
+      "point": 0.9643,
+      "lo": 0.88,
+      "hi": 1.0,
+      "se": 0.0365,
+      "n": 41
+    },
+    "coverage": {
+      "point": 0.6829,
+      "lo": 0.5366,
+      "hi": 0.8293,
+      "se": 0.0718,
+      "n": 41
+    },
+    "hallucination_unanswerable": {
+      "point": 0.0,
+      "lo": 0.0,
+      "hi": 0.0,
+      "se": 0.0,
+      "n": 41
+    },
+    "selective_error": {
+      "point": 0.0357,
+      "lo": 0.0,
+      "hi": 0.125,
+      "se": 0.0365,
+      "n": 41
+    },
+    "alpha_target": 0.1,
+    "guarantee_holds_at_point": true,
+    "guarantee_upper_ci_within_margin": true
+  }
+}

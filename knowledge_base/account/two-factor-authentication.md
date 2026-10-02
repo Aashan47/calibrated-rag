@@ -1,0 +1,3 @@
+# Two-factor authentication (2FA)
+
+Turn on two-factor authentication under Profile › Security › Two-factor authentication. You can use an authenticator app (recommended) or SMS codes. When you enable 2FA you are given 10 single-use backup codes; store them somewhere safe, because each code works once. Workspace Owners and Admins on the Business and Enterprise plans can require 2FA for every member under Settings › Security; members without 2FA are prompted to set it up at their next sign-in. If you lose your device and your backup codes, contact support@northwind.app; after identity verification, 2FA is reset within 24 to 48 hours.

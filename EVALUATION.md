@@ -1,169 +1,156 @@
 # Evaluation
 
-How this agent is evaluated, and what the numbers mean. The goal is the standard a deployed
-system is held to — not a single accuracy number, but **calibration, groundedness, agent
-behaviour, an ablation that justifies the design, and uncertainty intervals on all of it.**
+How the agent is evaluated and what the numbers mean. The bar is the one a deployed support system
+is held to: not a single accuracy number but **calibration, groundedness, agent behaviour, an
+ablation that justifies the design, and uncertainty intervals on all of it**, on the domain the
+agent actually runs in.
 
-All results are reproducible:
+Reproduce everything:
 
 ```bash
 export GEMINI_API_KEY=...
-python evaluate.py --alpha 0.20     # QA metrics, conformal calibration, charts  -> results/results.json
-python -m eval.ablation --alpha 0.20 # agent loop vs single-shot baseline          -> results/ablation.json
-python -m eval.behavior             # behaviour, groundedness, calibration CIs     -> results/behavior.json
-python retrieval_eval.py            # retrieval recall@k (lexical vs hybrid)       -> results/retrieval.json
-python -m unittest discover -s tests # unit + end-to-end eval-gate tests
+python evaluate.py --dataset helpdesk --alpha 0.10   # the product: calibrate on labelled tickets
+python evaluate.py --dataset squad    --alpha 0.20   # public benchmark
+python -m eval.ablation --dataset helpdesk           # agent loop vs single-shot
+python -m eval.behavior --dataset helpdesk           # behaviour, groundedness, bootstrap CIs
+python retrieval_eval.py                             # retrieval recall@k (SQuAD)
+python -m unittest discover -s tests                 # unit + eval gate + knowledge-base consistency
 ```
 
-## 1. Benchmark & protocol
+Outputs land in `results/helpdesk/` and `results/squad/` (JSON + SVG), all committed.
 
-- **Dataset:** SQuAD 2.0 dev slice — **300 questions over 32 passages**, deliberately including
-  **140 unanswerable** questions. Unanswerable questions are the point: they are where a RAG system
-  either hallucinates or correctly abstains, and most QA benchmarks don't test it.
-- **Model:** `gemini-2.5-flash`, fixed across every system compared (so differences are the
-  *method*, not the model). Provider isolated to `calibrated_rag/llm.py`.
-- **Correctness:** SQuAD Exact-Match / token-F1; an answer counts as correct at EM or F1 ≥ 0.5
-  (`metrics.is_correct`).
-- **Train/test discipline:** the conformal threshold is **calibrated on a 40% split and all headline
-  numbers are reported on the disjoint 60% test split** (`random.Random(13)`), so the reliability
-  guarantee is measured out-of-sample, never on the data that set it.
-- **Determinism:** fixed seeds for the data slice (7) and the split (13); raw predictions are cached
-  (`results/preds.json`) so the analysis is reproducible without re-querying.
+## 1. Two datasets, two jobs
+
+| | **helpdesk** (the product) | **squad** (the benchmark) |
+|---|---|---|
+| Corpus | 30 Northwind help-centre articles, 6 categories (`knowledge_base/`) | 32 SQuAD 2.0 passages |
+| Labelled questions | **68 tickets**: 46 answerable (gold answer + article), 22 plausible but **not covered** | **300**: 160 answerable, 140 unanswerable |
+| Why | The shipped threshold must be calibrated on the domain it runs in | Public, harder, comparable; shows the method transfers |
+| Split | 27 calibrate / **41 held-out** (`Random(13)`) | 120 calibrate / **180 held-out** |
+| Error target α | 0.10 | 0.20 |
+
+Correctness = SQuAD exact-match / token-F1 (correct at EM or F1 ≥ 0.5). Model `gemini-2.5-flash`
+throughout, so differences are the *method*. Predictions are cached, so analyses are reproducible
+without re-querying.
 
 ## 2. What we measure, and why
 
-| Dimension | Metric | Why it matters in production |
+| Dimension | Metric | In support terms |
 |---|---|---|
-| **Task quality** | selective accuracy, task accuracy, coverage | Accuracy *among answered* is the number a user feels; coverage is what you give up for it. |
-| **Safety** | hallucination rate on unanswerable Qs | The failure that destroys trust: a confident answer to a question with no answer. |
-| **Calibration** | ECE, reliability diagram | Does "confidence 0.8" mean 80% right? A threshold is only as good as the signal under it. |
-| **Guarantee** | selective error ≤ α on held-out test | Turns "abstains sometimes" into a *tunable risk contract* you can set and verify. |
-| **Groundedness** | citation-is-gold-passage rate | When it answers, is the answer actually supported by the passage it points to? |
-| **Agent behaviour** | searches/query, reformulation %, abstain source | Is it really deciding and acting, and does reformulation recover misses? |
-| **Design justification** | agent loop vs single-shot ablation | Does the loop earn its extra LLM calls, or is "agent" just a label? |
-| **Uncertainty** | 95% bootstrap CIs on every headline metric | A point estimate on 300 questions hides sampling noise; report the interval. |
+| Safety | wrong replies to uncovered tickets | The failure that costs trust: a confident invented policy |
+| Quality | selective accuracy, coverage | Accuracy of replies actually sent; share of tickets auto-resolved |
+| Outcome | task accuracy | Right reply **or** correct escalation |
+| Guarantee | selective error ≤ α on held-out | "Wrong replies stay under X%" as a verifiable contract |
+| Calibration | ECE, reliability diagram | Does confidence 0.8 mean 80% right? The threshold is only as good as the signal under it |
+| Groundedness | cited article = gold article | Is the reply actually supported by the article it cites? |
+| Behaviour | searches/ticket, reformulation %, escalation source | Is it deciding, and are escalations the agent's judgement or the gate's? |
+| Design | agent loop vs single-shot | Does the loop earn its calls, or is "agent" a label? |
+| Uncertainty | 95% bootstrap CIs | A point estimate on 41 tickets hides sampling noise |
 
-## 3. Three-system comparison (held-out test split)
+## 3. Help-centre results (held-out, n = 41)
 
-Same model, three policies, so the delta is the *reliability method*:
-
-1. **Naive RAG** — retrieve, always answer (no abstention).
-2. **+ model self-check** — answer only when the model itself says the question is answerable.
-3. **+ conformal dial** — also require self-consistency confidence ≥ the calibrated threshold τ.
-
-| Metric (test split, n=180) | Naive RAG | + self-check | **+ conformal** |
+| | Chatbot (always replies) | Agent, no threshold | **Agent, calibrated** |
 |---|---:|---:|---:|
-| Hallucination rate on unanswerable Qs | 100% | 16.9% | **9.0%** `[3.4, 15.7]` |
-| Selective accuracy (answered Qs) | 41.1% | 74.5% | **81.9%** `[72.9, 90.6]` |
-| Task accuracy (answer correctly *or* abstain) | 41.1% | 81.7% | 77.8% |
-| Coverage (fraction answered) | 100% | 54.4% | 40.0% `[32.8, 47.2]` |
+| Wrong replies to uncovered tickets | 100% | 0.0% | **0.0%** `[0.0, 0.0]` |
+| Accuracy of replies sent | 65.9% | 96.4% | **96.4%** `[88.0, 100]` |
+| Correct outcome (reply or escalate) | 65.9% | 95.1% | 95.1% |
+| Tickets auto-resolved | 100% | 68.3% | 68.3% `[53.7, 82.9]` |
 
-`[...]` = 95% bootstrap CI. **Conformal guarantee:** target α = 0.20; measured selective error on
-the held-out test split = **18.1%** `[9.5, 27.1]` ≤ 20% → the guarantee **holds at the point
-estimate**. The upper CI bound (27.1%) sits above the α + 5pp margin, i.e. on 300 questions the
-*estimate* of the guarantee still carries real variance — reported rather than hidden (see §7, §9).
+**Guarantee:** selective error on held-out tickets **3.6%** `[0.0, 12.5]` against a 10% target — holds
+at the point estimate, and the upper CI bound is inside the α + 5pp margin.
 
-**Reading it.** Abstention is what moves task accuracy off the floor (a naive RAG hallucinates on
-100% of unanswerable questions). The conformal layer then adds a *tunable guarantee*: set a target
-error α, and selective error on the held-out split comes in under it — a dial a naive RAG doesn't have.
+**Why the two agent columns match.** Conformal calibration searches for the lowest confidence
+threshold whose error on the calibration split is ≤ α. Here the agent's own "not covered" decision
+already achieves that (one error in 27 tickets), so τ = **0.00** and the gate adds nothing. That is
+the correct outcome of the procedure, not a shortcut: on SQuAD the same procedure sets τ = 1.00
+(unanimous samples only). At α = 0.05 the 27-ticket split is too coarse — a single error exceeds 5% —
+and conformal falls back to escalate-all; more labelled tickets fix that.
 
 ## 4. Calibration — the confidence signal
 
-The abstention threshold is only trustworthy if the confidence under it is calibrated. We compare
-two signals on the same model:
-
-- **Self-reported** — ask the model for a 0–100 confidence. Badly calibrated (says "100%" when wrong).
-- **Self-consistency** — sample the answer N times, use the agreement fraction. Hallucinations tend
-  to disagree across samples; genuine answers repeat.
-
-| Confidence signal | ECE (lower is better) |
-|---|---:|
-| Self-reported (model's own 0–100) | 0.247 |
-| **Self-consistency (agreement across N=5 samples)** | **0.190** |
-
-Lower ECE = confidence tracks real accuracy more closely. The reliability diagram
-(`results/reliability.svg`) shows this per-bin.
-
-## 5. Agent behaviour & groundedness
-
-Computed offline from the prediction traces (`eval/behavior.py`), so it costs no API calls.
-
-| Behaviour (300 questions) | Value |
-|---|---:|
-| Mean searches / query | 1.11 (max 4) |
-| Search-count distribution | 1→281, 2→10, 3→5, 4→4 |
-| Reformulated (ran > 1 search) | 6.3% |
-| Agent-initiated abstain (judged not in corpus) | 30.0% |
-| **Reformulation recovery** — seed-miss gold passages recovered | 1 of 2 (50%) |
-| Gold-passage recall: seed → after loop | 98.8% → 99.4% |
-| **Citation present on correct answers** | 100% |
-| **Citation points to the gold passage** (groundedness) | 100% (108/108) |
-
-- **Reformulation recovery** is the core agentic win: of the answerable questions whose *first*
-  search missed the gold passage, how many did a reformulated query recover? This is retrieval the
-  loop fixes that a single shot cannot.
-- **Citation groundedness** checks faithfulness: when the agent answers a question correctly, does
-  the passage it cites actually contain the gold answer?
-- **Abstention source** separates the two independent safety mechanisms — the agent deciding the
-  corpus can't support an answer vs. the confidence falling below τ.
-
-## 6. Ablation — does the decision loop earn its cost?
-
-The honest test of "agent vs. renamed pipeline." Same stack, two configurations on the same slice:
-**single-shot** (`CRAG_MAX_STEPS=0`: retrieve once, answer) vs. the **agent loop** (judge, reformulate,
-re-search, answer/abstain). `eval/ablation.py`.
-
-| Metric | Single-shot (max_steps=0) | **Agent loop** |
+| Signal | ECE helpdesk | ECE SQuAD |
 |---|---:|---:|
-| Gold-passage recall | 98.8% | **99.4%** |
-| Task accuracy (trust-model policy) | 80.6% | **81.7%** |
-| Hallucination on unanswerable (trust-model) | 20.2% | **16.9%** |
-| Selective accuracy at α=0.20 (calibrated) | — (abstain-all) | **81.9%** |
-| Coverage at α=0.20 (calibrated) | 0% | **40.0%** |
-| LLM calls / query (avg) | 5.0 | **4.6** |
+| Self-reported (model's own 0–100) | **0.028** | 0.247 |
+| Self-consistency, exact-string agreement | 0.156 | 0.190 |
+| **Self-consistency, meaning-clustered** (shipped) | **0.053** | — |
 
-Two honest readings. (1) On this **small, clean** corpus the first retrieval is already strong
-(98.8% recall), so the loop's *retrieval* lift is modest and reformulation fires on only 6% of
-queries — the gains show up on larger/noisier corpora where the first query misses more often.
-(2) Even here, the loop is a net win on the metrics that matter: lower hallucination and higher task
-accuracy at the same operating point, **no extra average cost** (early abstention skips the answer
-sampling, so 4.6 < 5.0 calls/query), and — most tellingly — under the same α=0.20 target the
-single-shot system's confidence could not meet the error bound at any coverage (conformal fell back
-to abstain-all, threshold 1.01), whereas the agent met it at 40% coverage. The decision loop makes
-the system *reliably answerable* where the single-shot one isn't.
+Exact-string agreement split votes between paraphrases of one fact ("$12" vs "$12 per user per
+month") and made the agent look less sure than it was. Clustering samples by token-F1 ≥ 0.5 (the
+same tolerance the correctness metric uses) brought ECE from 0.156 to 0.053. Self-reported
+confidence looks well calibrated on this easy set only because almost every attempted reply is
+right; on SQuAD it over-claims badly (0.247). Self-consistency is the signal that survives both.
+Reliability diagram: `results/helpdesk/reliability.svg`.
 
-If the loop lifts gold-passage recall and end-to-end task accuracy at a modest extra call budget, the
-agentic design is justified; if it didn't, the honest thing would be to drop it. (The abstention /
-calibration machinery is identical in both arms, so this isolates the *loop*.)
+## 5. Behaviour and groundedness (`eval/behavior.py`, offline)
 
-## 7. Uncertainty
+| Behaviour (68 tickets) | Value |
+|---|---:|
+| Mean searches / ticket | 1.10 (max 4) |
+| Reformulated (> 1 search) | 5.9% |
+| Escalation initiated by the agent's judgement | 30.9% of tickets |
+| Gold-article recall: first search → after loop | 97.8% → 97.8% |
+| **Citation points to the gold article** (correct replies) | **100%** (38/38) |
 
-Every headline metric in §3 is reported with a **95% percentile bootstrap CI** (2,000 resamples,
-`eval/stats.py`) over the test split. The conformal guarantee is reported both at the point estimate
-and as whether the **upper CI bound** stays within the target margin — the stricter, more honest bar.
+Escalations here come from the agent judging "not covered" (one cheap call) rather than from the
+confidence gate — the cheapest and most explainable path, and the one that produces the hand-off note.
 
-## 8. Tests as an eval gate
+## 6. Ablation — agent loop vs single-shot (`eval/ablation.py`)
 
-`tests/` runs offline in CI on every push:
+| Metric | Single-shot (`HDA_MAX_STEPS=0`) | Agent loop |
+|---|---:|---:|
+| Gold-article recall | 97.8% | 97.8% |
+| Task accuracy (trust-model) | 95.1% | 95.1% |
+| Selective accuracy (calibrated) | 96.3% | 96.4% |
+| Wrong replies to uncovered (trust-model) | 0.0% | 0.0% |
+| LLM calls / ticket | 5.0 | **4.5** |
 
-- `test_core.py` — unit tests for retrieval (incl. RRF fusion), metrics (EM/F1/ECE), conformal
-  calibration, self-consistency aggregation, and the agent loop's control flow (reformulate /
-  abstain / answer / no-spin).
-- `test_eval_gate.py` — **end-to-end regression**: the whole agent over a golden corpus with a
-  content-aware mock model, asserting it answers known questions with a citation to the *correct*
-  passage, abstains out-of-corpus, terminates within the step bound, and that single-shot mode does
-  exactly one retrieval. These are the behaviours a deploy must not silently regress.
+Honest reading: on 30 clean articles the first search almost always finds the right one, so the
+loop has nothing to recover and the two arms tie on quality. The loop still costs *less* on
+average, because judging "not covered" costs one call instead of five reply samples. Its retrieval
+value shows on the larger, noisier SQuAD corpus (§7), and would on a real help centre with hundreds
+of overlapping articles.
 
-## 9. Honest limits
+## 7. SQuAD 2.0 benchmark (held-out, n = 180)
 
-- **Single corpus, read-only QA.** Scope is deliberately tight so the contributions — an agent that
-  directs its own retrieval, and calibrated abstention — are done well rather than broadly.
-- **Small slice → variance.** 300 questions over 32 passages means the CIs are not tight; they are
-  reported precisely so the reader isn't misled by a point estimate.
-- **Calibration is corpus-specific.** τ is calibrated on SQuAD and is the right number *for SQuAD*.
-  Your own documents have no labels to calibrate on, so `ingest` mode uses a sensible default
-  (`CRAG_THRESHOLD`); a labeled Q&A set would give a real guarantee for your corpus.
-- **Self-consistency is not a proof.** A model that is *consistently* wrong can still pass; the
-  conformal layer bounds that risk empirically, it doesn't eliminate it.
-- **Citation = retrieval grounding, not entailment.** We check the cited passage is the gold one; a
-  claim↔span entailment verifier would be the stronger (and next) faithfulness check.
+| | Naive RAG | + self-check | **+ conformal** |
+|---|---:|---:|---:|
+| Hallucination on unanswerable | 100% | 16.9% | **9.0%** `[3.4, 15.7]` |
+| Selective accuracy | 41.1% | 74.5% | **81.9%** `[72.9, 90.6]` |
+| Task accuracy | 41.1% | 81.7% | 77.8% |
+| Coverage | 100% | 54.4% | 40.0% `[32.8, 47.2]` |
+
+Guarantee: selective error 18.1% `[9.5, 27.1]` ≤ 20% target (holds at the point estimate; upper CI
+above the margin on 300 questions). Ablation on SQuAD: the loop lifts gold recall 98.8% → 99.4%,
+cuts hallucination 20.2% → 16.9% (trust-model), costs 4.6 vs 5.0 calls, and — most tellingly — under
+the same α the single-shot system could not meet the bound at any coverage (escalate-all) while the
+agent met it at 40%. Retrieval ablation (lexical vs hybrid recall@k): `results/squad/retrieval.json`.
+
+## 8. Uncertainty
+
+Every headline metric is reported with a **95% percentile bootstrap CI** (2,000 resamples,
+`eval/stats.py`) over the held-out split, and the guarantee is checked both at the point estimate
+and at the upper CI bound.
+
+## 9. Tests as an eval gate (`tests/`, offline, CI on every push)
+
+- `test_core.py` — retrieval (incl. RRF), metrics, conformal calibration, self-consistency
+  aggregation, the loop's control flow, and **outage handling**: a failed model call is reported as
+  `error`, the trace stays honest, `decide()` refuses to reply.
+- `test_eval_gate.py` — the whole agent over a golden corpus with a content-aware mock model:
+  correct replies cite the correct article, uncovered questions escalate, the loop terminates,
+  single-shot does one retrieval.
+- `test_knowledge_base.py` — every ticket's gold article exists and textually contains an accepted
+  answer; lexical recall@3 ≥ 85%; the default corpus is the help centre. The shipped threshold is
+  calibrated on these files, so a broken link here would silently break the guarantee.
+
+## 10. Honest limits
+
+- **Small, clean, fictional corpus.** Northwind makes retrieval easy and the CIs wide; it is a
+  faithful shape of a real help centre, not a real one.
+- **68 tickets.** Enough to calibrate a 10% target with margin, not a 5% one.
+- **Citation ≠ entailment.** We check the cited article is the gold one, not that every clause of
+  the reply is entailed by it; a claim↔span verifier is the next step.
+- **Self-consistency is not a proof.** A consistently wrong model still passes; the conformal layer
+  bounds the risk empirically.
+- **Calibration is corpus-specific.** Ingest your own help centre and the threshold is a default
+  until you label ~50 of your tickets; the README shows how.

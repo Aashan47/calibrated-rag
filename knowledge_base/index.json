@@ -1,0 +1,12 @@
+{
+  "name": "Northwind Workspace help centre",
+  "company": "Northwind Workspace",
+  "categories": {
+    "billing": "Billing & plans",
+    "account": "Account & security",
+    "data": "Data & privacy",
+    "integrations": "Integrations & API",
+    "troubleshooting": "Troubleshooting",
+    "support": "Support & policies"
+  }
+}

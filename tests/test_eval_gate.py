@@ -13,9 +13,9 @@ retrieval. Safe for CI (no API key needed).
 import re
 import unittest
 
-from calibrated_rag import agent as agent_mod
-from calibrated_rag import llm
-from calibrated_rag.agent import Agent
+from helpdesk_agent import agent as agent_mod
+from helpdesk_agent import llm
+from helpdesk_agent.agent import Agent
 
 CORPUS = [
     "Paris is the capital of France and its largest city.",   # 0

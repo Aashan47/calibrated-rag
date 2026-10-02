@@ -1,267 +1,196 @@
-# calibrated-rag-agent
+# helpdesk-agent
 
-![CI](https://github.com/Aashan47/calibrated-rag-agent/actions/workflows/ci.yml/badge.svg)
+![CI](https://github.com/Aashan47/helpdesk-agent/actions/workflows/ci.yml/badge.svg)
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue)
 ![dependencies](https://img.shields.io/badge/dependencies-zero-brightgreen)
 ![license](https://img.shields.io/badge/license-MIT-green)
 
-**A retrieval agent that decides its own search strategy — and knows when to abstain, with a
-conformal-calibrated confidence.**
+**A customer-support agent that replies only from the help centre, cites the article, and
+escalates to a human when it can't — with the escalation threshold calibrated so wrong replies stay
+under a target rate.**
 
-Most RAG systems run a fixed path (retrieve once → answer) and answer *every* question, so they
-confidently hallucinate on the ones they can't actually support. In production that's the whole
-problem: you can't deploy an agent you can't trust. `calibrated-rag` fixes both halves. It's a real
-**agent** — a bounded decision loop where the LLM uses a search tool, judges whether the passages
-actually answer the question, **reformulates and searches again** when they don't, and decides for
-itself whether to answer or give up. And when it does answer, that decision is governed by a
-confidence threshold **calibrated with split-conformal selective prediction**, so *when it answers,
-it's right at a target rate you set.*
+Most support bots are a chat model with the help centre pasted in. They answer every ticket, and on
+the tickets the help centre doesn't cover they answer *confidently and wrongly* — a made-up refund
+window, an SLA that doesn't exist. For a business, one of those costs more than ten tickets routed
+to a human. `helpdesk-agent` is the reliability layer: every ticket ends as a **cited reply draft**,
+an **escalation with a hand-off note**, or an explicit **model-unavailable**, and the reply/escalate
+decision is governed by a confidence threshold **calibrated on labelled tickets** (split-conformal
+selective prediction), so *the rate of wrong replies is a number you set, not a hope.*
 
-Evaluated on **SQuAD 2.0** (which deliberately includes unanswerable questions), measuring not just
-accuracy but **calibration, hallucination rate, and the accuracy/coverage tradeoff.**
-
-- 🔁 **Agentic decision loop** — the LLM chooses to search / reformulate / answer / abstain each step, not a fixed pipeline
-- 🛠️ **Tool use** — a `search` tool the agent calls with its own (re)formulated queries
-- 🧠 **Self-consistency confidence** (agreement across samples), not the LLM's miscalibrated "100%"
-- 📉 **Conformal abstention** with a risk target — a reliability guarantee on answered questions
-- 🔎 **Citations** — every answer points to the passage that supports it
-- 🔀 **Hybrid retrieval** — TF-IDF + Gemini embeddings fused with Reciprocal Rank Fusion (lexical fallback)
-- 🖥️ **Web interface + CLI** — see the knowledge base it answers from, the answer or the stated reason for abstaining, confidence vs threshold, the cited passage, and the full agent trace; compare side-by-side with the same model given no documents (`serve.py`)
-- 🚦 **Outages are not abstentions** — a failed or rate-limited model call is reported as "model unavailable", never as "the agent judged it unanswerable"
-- 📁 **Bring your own docs** — index a folder and query it, not just the benchmark (`ingest.py`)
-- 📊 **Measured, not claimed** — selective accuracy, ECE, hallucination reduction, accuracy-vs-coverage
-- ✅ **Tested + CI** — offline unit tests (incl. the agent loop) run in GitHub Actions
-- 🪶 **Zero dependencies** — pure Python stdlib (retrieval, charts, HTTP server, API client)
+- 🎫 **Ticket in, decision out** — reply draft with the source article, or escalation with a hand-off note (what was searched, closest articles, why it stopped, what to add to the help centre)
+- 🔁 **An agent, not a pipeline** — the LLM decides each step: search again with a reworded query, draft a reply, or stop because the help centre doesn't cover it
+- 📉 **Calibrated escalation** — threshold set on 68 labelled Northwind tickets for a 10% error target; measured **3.6%** on the held-out split
+- 🧠 **Self-consistency confidence** — agreement across N independent reply samples (clustered by meaning), not the model's self-reported number
+- 🚦 **Outages are never escalations** — a rate-limited or failed call is reported as "model unavailable", with the HTTP status, never as "not covered"
+- 🖥️ **Support console** — browse the help centre, handle tickets, see confidence vs threshold, the cited article, the agent's full trace, and what a generic chatbot would have said instead
+- 📁 **Your own help centre** — `ingest.py` indexes a folder of articles; label ~50 of your tickets and calibrate the threshold for *your* domain
+- 📊 **Measured** — calibration, groundedness, agent behaviour, an ablation against single-shot, and bootstrap CIs; also run on SQuAD 2.0 as a public benchmark
+- 🪶 **Zero dependencies** — standard library only: retrieval, server, UI, charts, API client
 
 ---
 
-## Results
+## Results on the help centre
 
-SQuAD 2.0 dev slice — **300 questions** (140 unanswerable) over 32 passages, model
-`gemini-2.5-flash`, target error α = 0.20. Three systems, same underlying model:
+The Northwind Workspace help centre (30 articles, 6 categories, committed in `knowledge_base/`) and
+**68 labelled tickets**: 46 answerable (gold answer + article) and 22 plausible tickets it does
+**not** cover (on-prem version, startup discount, Teams integration …). 27 tickets calibrate the
+threshold, **41 held-out tickets** report the numbers. Model `gemini-2.5-flash`, error target
+α = 0.10.
 
-| | Naive RAG (answers all) | + model self-check | **+ conformal dial** |
+| held-out tickets (n=41) | Chatbot (always replies) | Agent, no threshold | **Agent, calibrated** |
 |---|---:|---:|---:|
-| **Hallucination rate on unanswerable Qs** | 100% | 16.9% | **9.0%** |
-| **Accuracy on answered questions** | 41% | 74.5% | **81.9%** |
-| Task accuracy (answer correctly *or* abstain) | 41% | 81.7% | 77.8% |
-| Coverage (fraction answered) | 100% | 54% | 40% |
+| **Wrong replies to uncovered tickets** | 100% | 0.0% | **0.0%** |
+| **Accuracy of replies sent** | 65.9% | 96.4% | **96.4%** `[88, 100]` |
+| Correct outcome (right reply *or* correct escalation) | 65.9% | 95.1% | 95.1% |
+| Tickets auto-resolved | 100% | 68.3% | 68.3% `[54, 83]` |
+| Selective error vs target | — | — | **3.6% ≤ 10%** `[0, 12.5]` |
 
-95% bootstrap CIs on the calibrated column (test split, n=180): selective accuracy
-**81.9% [72.9, 90.6]**, hallucination **9.0% [3.4, 15.7]**, coverage **40.0% [32.8, 47.2]** —
-see [EVALUATION.md](EVALUATION.md). Two things to read here:
+`[...]` = 95% bootstrap CI. Three honest readings:
 
-1. **Abstention is the whole game.** A vanilla RAG that always answers hallucinates on *every*
-   unanswerable question (100%) and lands at 41% task accuracy. Letting the agent say "I can't
-   answer this" takes task accuracy to 82%.
-2. **The conformal layer adds a tunable *guarantee* on top.** Set a target error α; it calibrates
-   the confidence threshold on held-out data so accuracy on answered questions clears it — verified
-   on a disjoint test split (**18.1% error ≤ 20% target**). It lifts answered-accuracy from 75% to
-   **82%** and cuts the hallucination rate on unanswerable questions by nearly half (17% → **9%**), at
-   a coverage cost. A naive RAG gives you no such dial.
+1. **Escalation is the whole game.** A chatbot that always replies gets 34% of tickets wrong — every
+   uncovered ticket becomes an invented policy. Letting the agent say "not covered" takes correct
+   outcomes to 95% and wrong replies on uncovered tickets to **zero**.
+2. **On this help centre the threshold didn't need to bite.** Calibration found that the agent's own
+   "not covered" judgement already meets the 10% target, so τ = 0.00 and the two agent columns match.
+   The gate is a safety net: on the harder SQuAD benchmark the same procedure sets τ = 1.00 (reply only
+   on unanimous samples) to hold a 20% target. You choose α; the data chooses τ.
+3. **Citations are grounded.** On every correctly resolved ticket the cited article is the gold one
+   (100%, 38/38).
 
-**Calibration ablation — the confidence signal matters.** With the same model, the *raw
-self-reported* confidence gives ECE **0.247**; **self-consistency** (agreement across samples) gives
-ECE **0.190**. A better-calibrated signal is what makes the abstention threshold trustworthy.
-
-**Agent ablation — the loop earns its place.** Versus a single-shot baseline (retrieve once, answer)
-on the same slice: the agent lifts gold-passage recall (98.8% → 99.4%) and cuts hallucination
-(20.2% → 16.9%, trust-model policy) at **no extra average cost** (4.6 vs 5.0 LLM calls/query —
-early abstention skips answer sampling). And under the same α=0.20 target the single-shot system's
-confidence couldn't meet the error bound at *any* coverage (conformal fell back to abstain-all),
-while the agent met it at 40% coverage. Full numbers, behaviour, and groundedness (citations point to
-the gold passage **100%** of the time on correct answers) in **[EVALUATION.md](EVALUATION.md)**.
+**Confidence signal.** Clustering reply samples by *meaning* (token-F1, so "$12" and "$12 per user
+per month" agree) brought self-consistency ECE from 0.156 to **0.053**; the model's self-reported
+confidence is 0.028 here but 0.247 on SQuAD, where it over-claims — self-consistency is the signal
+that survives both.
 
 <p>
-<img src="results/reliability.svg" width="440" alt="Reliability diagram">
-<img src="results/coverage.svg" width="440" alt="Selective accuracy vs coverage">
+<img src="results/helpdesk/reliability.svg" width="440" alt="Reliability diagram">
+<img src="results/helpdesk/coverage.svg" width="440" alt="Selective accuracy vs coverage">
 </p>
 
-Left: how closely the self-consistency confidence tracks real accuracy. Right: the core tradeoff —
-answer fewer questions, and the ones you answer get more accurate; the circled point is the
-calibrated operating point.
-
-### Retrieval ablation
-
-Retrieval is **hybrid** — TF-IDF fused with Gemini embeddings via Reciprocal Rank Fusion, with
-automatic lexical-only fallback when no embedding key is present. Recall of the gold passage on the
-same 300 questions:
-
-| recall@k | lexical (TF-IDF) | hybrid |
-|---|---:|---:|
-| @1 | 93.7% | **96.0%** |
-| @3 | 98.3% | **99.3%** |
-| @5 | 99.3% | 99.7% |
-
-On this small, clean corpus both saturate by k=5; hybrid's edge (notably at @1) grows on larger,
-noisier document sets. `CRAG_RETRIEVER=tfidf` forces lexical-only.
+Full methodology, the SQuAD 2.0 benchmark (300 questions), the agent-loop ablation, behaviour and
+groundedness analyses: **[EVALUATION.md](EVALUATION.md)**.
 
 ---
 
 ## How it works
 
-It's an **agent**, not a fixed pipeline: at each step the LLM looks at what it has retrieved and
-**chooses its next action** — search again with a reformulated query, answer now, or abstain —
-instead of running a hard-coded retrieve→answer path. The loop is bounded so it always terminates,
-and the final answer still faces the calibrated confidence gate.
-
 ```
-question
+ticket
    │
+   ▼  search(ticket text)                       ── tool call → top-k articles
+┌── agent loop (bounded) ───────────────────────────────────────────────────────────┐
+│  decide: the LLM reads the gathered articles and picks the next action            │
+│     • answer   → articles are sufficient, draft a reply                           │
+│     • search   → insufficient; reformulate the query and loop                     │
+│     • abstain  → the help centre doesn't cover this; stop                → ESCALATE│
+└───────────────────────────────────────────────────────────────────────────────────┘
+   │  (answer)
    ▼
- ┌─────────────────────────────  agent loop (bounded)  ─────────────────────────────┐
- │  search(query)        tool call → top-k passages added to working context        │
- │       │                                                                           │
- │       ▼                                                                           │
- │  decide  ── the LLM judges the gathered passages and picks the next action: ──┐   │
- │       │        • answer   → passages are sufficient, go answer                │   │
- │       │        • search   → insufficient; reformulate the query and loop ◀────┘   │
- │       │        • abstain  → answer isn't in this corpus; stop                     │
- └───────┼───────────────────────────────────────────────────────────────────────┘
-         ▼  (answer)
-[A] Self-consistency   the model answers from ONLY the gathered passages, N times
-   │                   concurrently; confidence = agreement across the N samples
+[A] Self-consistency   N independent reply samples from ONLY the gathered articles;
+   │                   confidence = share that agree on the key fact; cite the article
    ▼
-[B] Conformal gate     calibrated threshold τ (target error α on a held-out split):
-   │                   answer iff confidence ≥ τ, else abstain
+[B] Conformal gate     reply iff confidence ≥ τ, τ calibrated on labelled tickets for target α
    ▼
-answer + cited passage + confidence     OR     "I can't answer this reliably"
+RESOLVED: reply draft + source article + confidence    or    ESCALATED: hand-off note
 ```
 
-**Two ways it abstains.** The agent can *decide* the corpus can't support an answer (step `abstain`
-in the loop), and — independently — the self-consistency confidence can fall below the calibrated
-threshold (step B). Both protect against confident nonsense.
+**Two ways to escalate, one way to fail.** The agent can judge the help centre doesn't cover a
+ticket (one cheap call), or the confidence can fall below τ after drafting. A failed API call is a
+*third* outcome — `model unavailable` — and is never reported as either of the first two.
 
-**The core idea (step B).** A single LLM confidence is poorly calibrated — the model says it's
-certain even when it's wrong. So confidence here is *self-consistency*: ask several times, measure
-agreement. Then, instead of picking a threshold by hand, we **calibrate** it: on a held-out split
-we find the lowest confidence threshold whose empirical error among answered questions is ≤ α, and
-verify the guarantee holds on a disjoint test split. This is the selective-prediction / conformal
-risk-control idea — trade a little coverage for a reliability guarantee on what you answer.
+**The hand-off note is deterministic** — built from the trace (queries run, closest articles,
+reason), no extra model call — so it is always there, never invents, and tells the team what to add
+to the help centre so the next such ticket resolves itself.
 
 ---
 
 ## Quickstart
 
-No install needed (Python 3.10+, standard library only). Set a Gemini API key:
+No install (Python 3.10+, standard library only). Set a Gemini key:
 
 ```bash
-export GEMINI_API_KEY=...        # or GEMENI_API_KEY
+export GEMINI_API_KEY=...
+
+python serve.py                 # support console at http://localhost:8000
+python ask.py "Can we pay by bank transfer?"            # -> cited reply draft
+python ask.py "Do you have an on-prem version?"         # -> escalated, with closest articles
+
+# your own help centre
+python ingest.py ./help-centre --name "Acme"            # .md/.txt articles -> data/index.json
+python serve.py                                         # now answers from your articles
+
+# evaluation
+python evaluate.py --alpha 0.10                         # calibrate on knowledge_base/tickets.json
+python evaluate.py --dataset squad --alpha 0.20         # public benchmark
+python -m eval.ablation; python -m eval.behavior        # loop vs single-shot; behaviour + CIs
+python -m unittest discover -s tests -v                 # offline: unit, eval gate, KB consistency
 ```
 
-```bash
-# Web interface — open http://localhost:8000
-#   left: every passage the agent can answer from (filterable; retrieved + cited ones highlight)
-#   right: answer or abstention with its reason, confidence vs calibrated threshold, cited
-#          passage, the agent's trace (each search, decision, failed call), and a
-#          "compare with a plain LLM" button that asks the same model with no documents
-python serve.py
-# JSON API: GET /meta, GET /corpus, POST /ask {"question"}, POST /compare {"question"}
+JSON API: `GET /meta`, `GET /articles`, `POST /ticket {"message"}`, `POST /compare {"message"}`,
+`GET /health`.
 
-# Ask from the CLI
-python ask.py "Who was yersinia pestis named for?"    # -> Alexandre Yersin (with citation)
-python ask.py "What is the capital of Mars?"          # -> abstains
+Config via env: `HDA_MODEL`, `HDA_EMBED_MODEL`, `HDA_RETRIEVER=tfidf|hybrid`, `HDA_THRESHOLD`
+(override τ), `HDA_SAMPLES` (reply samples per ticket, default 5), `HDA_MAX_STEPS` (loop bound,
+default 3). The provider is isolated to `helpdesk_agent/llm.py`.
 
-# Query YOUR OWN documents instead of the demo corpus
-python ingest.py path/to/docs --name "My Docs"        # index a folder of .txt/.md
-python serve.py                                       # now answers over your docs
-
-# Reproduce the evaluation (downloads SQuAD 2.0, runs the agent, writes results + charts)
-python evaluate.py --alpha 0.20
-
-# Measure retrieval quality (lexical vs hybrid recall@k)
-python retrieval_eval.py
-
-# Production eval suite
-python -m eval.ablation --alpha 0.20   # agent loop vs single-shot baseline
-python -m eval.behavior                # behaviour, groundedness, calibration w/ bootstrap CIs
-
-# Run the tests (offline, no API key needed) — unit + end-to-end eval gate
-python -m unittest discover -s tests -v
-```
-
-Config via env: `CRAG_MODEL` (LLM), `CRAG_EMBED_MODEL` (embeddings), `CRAG_RETRIEVER=tfidf|hybrid`,
-`CRAG_THRESHOLD` (abstention cutoff for custom corpora), `CRAG_SAMPLES` (answer samples per
-question, default 5), `CRAG_MAX_STEPS` (decision-loop bound, default 3). The LLM provider is
-isolated to `calibrated_rag/llm.py`, so moving to Claude or GPT is a small change.
-
-**Rate limits.** A question costs ~1 decision call + `CRAG_SAMPLES` answer samples (plus one per
-reformulation). Gemini's free tier allows roughly 10–15 requests/minute, so on a free key set
-`CRAG_SAMPLES=3` (the Render blueprint does). If the API rate-limits or the key is bad, the
-interface reports **model unavailable** with the HTTP status — it never passes an outage off as an
-abstention.
+**Rate limits.** A ticket costs ~1 decision call + `HDA_SAMPLES` samples. Gemini's free tier allows
+roughly 10–15 requests/minute, so on a free key set `HDA_SAMPLES=3` (the Render blueprint does).
+When the API rate-limits, the console says **model unavailable** with the status code.
 
 ### Deploy
 
-A `render.yaml` blueprint is included for a free one-click deploy on
-[Render](https://render.com): **New → Blueprint → pick this repo → paste your `GEMINI_API_KEY`**.
-The hosted demo boots in under a second (TF-IDF over a small committed corpus) and answers readily
-while still abstaining on unanswerable questions.
+`render.yaml` is a one-click [Render](https://render.com) blueprint: **New → Blueprint → this repo →
+paste `GEMINI_API_KEY`**. Boots in under a second (lexical retrieval over the committed help centre).
+
+### Calibrating for your own help centre
+
+The shipped τ is right for Northwind. For yours: ingest your articles, write ~50 tickets as
+`knowledge_base/tickets.json` does (`question`, accepted `answers`, the `article` slug, and
+`is_impossible: true` for tickets you know aren't covered), then `python evaluate.py`. The threshold
+in `results/helpdesk/results.json` is then calibrated on your domain and `serve.py` picks it up.
 
 ---
 
 ## Repo layout
 
 ```
-calibrated_rag/
-  agent.py        # the agent: bounded decision loop (search/reformulate/answer/abstain) + self-consistency
-  tools.py        # tools the agent can call (search over the corpus); extensible
-  llm.py          # model-agnostic answer-or-abstain + decision client (stdlib urllib)
-  embeddings.py   # Gemini embeddings with on-disk cache + graceful fallback
+helpdesk_agent/
+  agent.py        # the agent: bounded decision loop (search / reformulate / reply / escalate)
+  tools.py        # tools the agent can call (search over the help centre)
+  llm.py          # model-agnostic client: decisions, reply samples, LLMError (swap for Claude/GPT)
   retriever.py    # TF-IDF + hybrid (RRF of lexical + dense) retrieval
+  embeddings.py   # Gemini embeddings with on-disk cache + graceful fallback
   conformal.py    # split-conformal selective-prediction threshold
-  metrics.py      # SQuAD EM/F1, ECE, reliability bins
-  charts.py       # hand-written SVG reliability + coverage charts
-  corpus.py       # load the SQuAD slice OR an ingested custom corpus
-  data.py         # SQuAD 2.0 loader
-  trace.py        # append-only JSONL query trace (observability)
-  ui/index.html   # the web interface (served by serve.py; no build step, no CDN)
-evaluate.py       # full QA evaluation → results/results.json + charts
-retrieval_eval.py # retrieval ablation (lexical vs hybrid recall@k)
-eval/
-  stats.py        # bootstrap confidence intervals (uncertainty on every metric)
-  behavior.py     # agent behaviour, reformulation recovery, citation groundedness, calibration CIs
-  ablation.py     # agent decision loop vs single-shot baseline — does the loop earn its calls?
-serve.py          # zero-dep web interface + JSON API (/meta, /corpus, /ask, /compare)
-ask.py            # interactive CLI
-ingest.py         # index your own .txt/.md docs
-tests/            # offline tests: unit (test_core) + end-to-end eval gate (test_eval_gate)
-.github/workflows/ci.yml   # runs the tests on every push/PR
+  corpus.py       # help centre / ingested corpus loader; threshold selection
+  datasets.py     # labelled sets: helpdesk tickets, SQuAD 2.0
+  metrics.py      # EM/F1, ECE, reliability bins
+  charts.py       # hand-written SVG charts
+  trace.py        # append-only JSONL ticket log
+  ui/index.html   # the support console (no build step, no CDN)
+knowledge_base/   # 30 Northwind articles in 6 categories + 68 labelled tickets
+serve.py          # console + JSON API         ask.py  # CLI         ingest.py  # your articles
+evaluate.py       # calibration run → results/<dataset>/
+eval/             # ablation.py (loop vs single-shot), behavior.py (behaviour, groundedness, CIs), stats.py
+tests/            # unit (test_core), end-to-end eval gate, knowledge-base consistency
+results/helpdesk/ results/squad/   # committed numbers and charts
 ```
 
-Full methodology, metrics, and results in **[EVALUATION.md](EVALUATION.md)**.
-
-See [ARCHITECTURE.md](ARCHITECTURE.md) for the design decisions and extension points.
+Design decisions and extension points: [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ---
 
-## Design notes & honest limits
+## Honest limits
 
-- **Retrieval is hybrid** (TF-IDF + Gemini embeddings, fused with Reciprocal Rank Fusion), with an
-  automatic lexical-only fallback when no embedding key is available. A cross-encoder reranker would
-  be the next step and is isolated to `retriever.py`.
-- **Confidence = self-consistency over N samples.** Cheap and far better calibrated than
-  self-reported confidence, but a model that is *consistently* wrong can still slip through — the
-  conformal layer bounds the risk, it doesn't eliminate it.
-- **Conformal guarantee is split-conformal / finite-sample**, reported empirically on a held-out
-  test split rather than proven here; with a small slice the coverage estimate has variance.
-- **Calibration is corpus-specific.** The conformal threshold is calibrated on SQuAD and is the
-  right number *for that benchmark*. On your own documents there's no labeled data to calibrate
-  against, so `ingest` mode uses a sensible default (answer when ≥ 3/5 samples agree); override with
-  `CRAG_THRESHOLD=0.x`, or supply a labeled Q&A set to get a real guarantee for your corpus.
-- **The agent loop is bounded and costs calls.** It adds one decision call per step (default ≤ 3
-  steps, `CRAG_MAX_STEPS`) on top of the N answer samples, and refuses to repeat a query so it can't
-  spin. On a small, clean corpus the first retrieval is usually enough, so the reformulation earns
-  its keep mainly on larger/noisier document sets where the first query misses.
-- **Scope is intentionally tight** (one corpus, read-only QA) so the contributions — *an agent that
-  directs its own retrieval* and *calibrated abstention* — are the things done well.
-
----
-
-## Why I built this
-
-Agents that run real work fail on *trust*, not capability — they hallucinate confidently and nobody
-can rely on them. The interesting engineering is making them know when **not** to answer, with a
-number behind it. This is a small, honest demonstration of exactly that.
+- **One help centre, read-only.** No account lookups or actions; those are tool extension points.
+- **Northwind is fictional and small.** 30 clean articles make retrieval easy (97.8% recall@3) and
+  leave the agent loop little to recover; the loop's value shows on larger, messier corpora, and the
+  SQuAD run is there to show the method under harder conditions.
+- **68 tickets is a small calibration set.** The 10% target holds at the point estimate with an
+  upper CI of 12.5%; at α = 0.05 the split is too coarse and conformal falls back to escalate-all.
+  More labelled tickets tighten both.
+- **Citation ≠ entailment.** We check the cited article is the gold one, not that every clause of
+  the reply is entailed by it.
+- **Self-consistency is not a proof.** A consistently wrong model still passes; the conformal layer
+  bounds that risk empirically.
 
 MIT licensed.

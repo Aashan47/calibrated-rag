@@ -15,7 +15,7 @@ import time
 import urllib.error
 import urllib.request
 
-_MODEL = os.environ.get("CRAG_MODEL", "gemini-2.5-flash")
+_MODEL = os.environ.get("HDA_MODEL", "gemini-2.5-flash")
 _ENDPOINT = ("https://generativelanguage.googleapis.com/v1beta/models/"
              "{model}:generateContent?key={key}")
 
@@ -86,16 +86,18 @@ def complete(prompt: str, max_tokens: int = 256, temperature: float = 0.0) -> st
         raise LLMError(_describe(exc)) from exc
 
 
-_PROMPT = """You are a careful question-answering assistant. Answer the QUESTION using ONLY \
-the numbered PASSAGES below. If the passages do not contain enough information to answer, do \
-not guess — mark it unanswerable.
+_PROMPT = """You are a customer-support agent. Answer the customer's QUESTION using ONLY the \
+numbered help-centre ARTICLES below. If the articles do not contain the information needed, do \
+not guess and do not use outside knowledge — mark it unanswerable so a human can take it.
 
 Return ONLY a JSON object, no prose, no markdown:
-{{"answerable": <true|false>, "answer": "<short exact answer, or empty string>", \
-"cite": <the passage number your answer comes from, or 0 if none>, \
-"confidence": <integer 0-100: how confident you are the answer is correct AND supported by a passage>}}
+{{"answerable": <true|false>, \
+"answer": "<the key fact in a few words, e.g. '14 days' or 'No, Enterprise only'; empty if unanswerable>", \
+"reply": "<one or two friendly sentences to send the customer, stating the fact; empty if unanswerable>", \
+"cite": <the article number the answer comes from, or 0 if none>, \
+"confidence": <integer 0-100: how confident you are the answer is correct AND stated in an article>}}
 
-PASSAGES:
+ARTICLES:
 {context}
 
 QUESTION: {question}
@@ -126,6 +128,7 @@ def answer_or_abstain(question: str, context: str, temperature: float = 0.0) -> 
             cite = 0
         return {"answerable": bool(obj.get("answerable", False)),
                 "answer": str(obj.get("answer", "")).strip(),
+                "reply": str(obj.get("reply", "")).strip(),
                 "cite": cite, "confidence": conf}
     except Exception:  # noqa: BLE001
         return {**blank, "error": "model returned an unparseable response"}

@@ -3,14 +3,14 @@
 The honest test of "is this really an agent, or just a renamed pipeline" is whether the loop
 earns its extra LLM calls. We run the identical stack two ways on the same SQuAD slice:
 
-  * single-shot  (CRAG_MAX_STEPS=0): retrieve once, answer. The classic RAG pipeline.
+  * single-shot  (HDA_MAX_STEPS=0): retrieve once, answer. The classic RAG pipeline.
   * agent        (default loop):     judge sufficiency, reformulate + re-search, then answer.
 
 and compare gold-passage recall, end-to-end task accuracy / hallucination, and the cost in
 LLM calls per query. Predictions are cached (results/preds.json for the agent, written by
 evaluate.py; results/preds_single.json here) so re-analysis is free.
 
-    GEMINI_API_KEY=... python -m eval.ablation --alpha 0.20
+    GEMINI_API_KEY=... python -m eval.ablation [--dataset helpdesk|squad] --alpha 0.20
 """
 
 from __future__ import annotations
@@ -20,12 +20,12 @@ import json
 import os
 import random
 
-from calibrated_rag import conformal, data
-from calibrated_rag.agent import Agent
+from helpdesk_agent import conformal, datasets
+from helpdesk_agent.agent import Agent
 from evaluate import per_item, system_stats
 
 HERE = os.path.dirname(os.path.dirname(__file__))
-RESULTS = os.path.join(HERE, "results")
+RESULTS = os.path.join(HERE, "results")   # set per dataset in main()
 
 
 def run_predictions(contexts, items, max_steps, cache):
@@ -80,10 +80,13 @@ def evaluate_system(items, preds, alpha):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--alpha", type=float, default=0.20)
+    ap.add_argument("--dataset", default="helpdesk", choices=["helpdesk", "squad"])
     args = ap.parse_args()
+    global RESULTS
+    RESULTS = os.path.join(HERE, "results", args.dataset)
     os.makedirs(RESULTS, exist_ok=True)
 
-    contexts, items = data.load()
+    contexts, items = datasets.load(args.dataset)
     print(f"Loaded {len(items)} questions over {len(contexts)} passages.\n")
 
     print("Agent (decision loop) — reusing results/preds.json ...")
@@ -94,6 +97,7 @@ def main():
                                    cache=os.path.join(RESULTS, "preds_single.json"))
 
     report = {
+        "dataset": args.dataset,
         "alpha_target_error": args.alpha,
         "single_shot": evaluate_system(items, single_preds, args.alpha),
         "agent_loop": evaluate_system(items, agent_preds, args.alpha),

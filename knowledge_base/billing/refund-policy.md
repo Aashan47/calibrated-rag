@@ -1,0 +1,3 @@
+# Refund policy
+
+Monthly subscriptions are not refundable; when you cancel, the plan stays active until the end of the current month and no further charges are made. Annual subscriptions can be refunded in full if you request the refund within 14 days of the purchase or renewal date. After 14 days, an annual plan is not refunded in cash, but the unused portion is applied as a prorated credit to your workspace balance when you downgrade or cancel. Approved refunds are returned to the original payment method and usually appear within 5 to 7 business days, depending on your bank. To request a refund, the workspace Owner or a Billing admin should email billing@northwind.app with the invoice number.

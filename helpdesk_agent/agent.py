@@ -65,8 +65,8 @@ class Agent:
                  max_steps: int = 3, retriever: str = "") -> None:
         self.contexts = contexts
         # default: hybrid (lexical + embeddings), which self-falls-back to lexical if no
-        # embeddings are available. Set CRAG_RETRIEVER=tfidf to force lexical-only.
-        choice = retriever or os.environ.get("CRAG_RETRIEVER", "hybrid")
+        # embeddings are available. Set HDA_RETRIEVER=tfidf to force lexical-only.
+        choice = retriever or os.environ.get("HDA_RETRIEVER", "hybrid")
         if choice == "tfidf":
             self.retriever = TfidfRetriever(contexts)
             self.retrieval_mode = "lexical"
@@ -75,12 +75,12 @@ class Agent:
             self.retriever = hr
             self.retrieval_mode = hr.mode
         self.k = k
-        # CRAG_SAMPLES lets a rate-limited deployment trade a little calibration quality
+        # HDA_SAMPLES lets a rate-limited deployment trade a little calibration quality
         # for fewer calls per question (each question costs ~1 decision + N samples).
-        self.n = max(1, int(os.environ.get("CRAG_SAMPLES", n_samples)))
+        self.n = max(1, int(os.environ.get("HDA_SAMPLES", n_samples)))
         # max_steps = 0 disables the decision loop (single retrieve→answer) — used as the
         # ablation baseline in eval/ablation.py to measure what the agent loop actually buys.
-        self.max_steps = max(0, int(os.environ.get("CRAG_MAX_STEPS", max_steps)))
+        self.max_steps = max(0, int(os.environ.get("HDA_MAX_STEPS", max_steps)))
         self.search = SearchTool(self.retriever, contexts, k=k)
 
     # -- the agent loop -----------------------------------------------------------------
@@ -186,9 +186,24 @@ class Agent:
 
     @staticmethod
     def _abstained(gathered: list[int], steps: list[dict], calls: int) -> dict:
-        return {"answerable": False, "answer": "", "confidence": 0.0, "selfreport": 0.0,
-                "votes": 0, "errors": 0, "retrieved": gathered, "citation": None,
-                "steps": steps, "llm_calls": calls}
+        return {"answerable": False, "answer": "", "reply": "", "confidence": 0.0,
+                "selfreport": 0.0, "votes": 0, "errors": 0, "retrieved": gathered,
+                "citation": None, "steps": steps, "llm_calls": calls}
+
+
+def _same_fact(a: str, b: str) -> bool:
+    """Two normalised short answers state the same fact if one contains the other or their
+    token overlap (F1) is at least 0.5 — the same tolerance the evaluation uses for correctness."""
+    if not a or not b:
+        return False
+    if a == b or a in b or b in a:
+        return True
+    ta, tb = a.split(), b.split()
+    common = sum((Counter(ta) & Counter(tb)).values())
+    if not common:
+        return False
+    p, r = common / len(tb), common / len(ta)
+    return 2 * p * r / (p + r) >= 0.5
 
 
 def _aggregate(samples: list[dict], n: int) -> dict:
@@ -199,24 +214,34 @@ def _aggregate(samples: list[dict], n: int) -> dict:
     result carries `error` and must be reported as an outage, not an abstention."""
     errors = [s["error"] for s in samples if s.get("error")]
     answerable_votes = sum(s["answerable"] for s in samples)
-    votes: dict[str, list] = defaultdict(lambda: [0, "", []])
+    # Cluster answers by *meaning*, not exact string: "$12" and "$12 per user per month" are
+    # the same fact. Exact matching split such votes and made the agent look less sure than
+    # it was (under-confident, measurably worse ECE on the help-centre set).
+    clusters: list[list] = []          # [count, answer, cites, reply, norm_key]
     for s in samples:
         if s["answerable"] and s["answer"]:
             key = _norm(s["answer"])
-            votes[key][0] += 1
-            votes[key][1] = s["answer"]
-            votes[key][2].append(s.get("cite", 0))
+            for c in clusters:
+                if _same_fact(key, c[4]):
+                    c[0] += 1
+                    c[2].append(s.get("cite", 0))
+                    if not c[3] and s.get("reply"):
+                        c[3] = s["reply"]
+                    break
+            else:
+                clusters.append([1, s["answer"], [s.get("cite", 0)], s.get("reply", ""), key])
+    votes = clusters
     if votes:
-        top = max(votes.values(), key=lambda v: v[0])
-        confidence, answer = top[0] / n, top[1]
+        top = max(votes, key=lambda v: v[0])
+        confidence, answer, reply = top[0] / n, top[1], top[3]
         cite_local = Counter(c for c in top[2] if c).most_common(1)
         cite_local = cite_local[0][0] if cite_local else 0
     else:
-        confidence, answer, cite_local = 0.0, "", 0
+        confidence, answer, reply, cite_local = 0.0, "", "", 0
     # the model's raw self-reported confidence (for the calibration ablation)
     sr = [s["confidence"] for s in samples if s["answerable"]]
     selfreport = sum(sr) / len(sr) if sr else 0.0
-    out = {"answerable": answerable_votes / n >= 0.5, "answer": answer,
+    out = {"answerable": answerable_votes / n >= 0.5, "answer": answer, "reply": reply,
            "confidence": confidence, "selfreport": selfreport, "cite_local": cite_local,
            "votes": answerable_votes, "errors": len(errors)}
     if errors and len(errors) == len(samples):
@@ -234,5 +259,6 @@ def decide(pred: dict, threshold: float) -> dict:
         and pred.get("confidence", 0.0) >= threshold
     return {"answered": answered,
             "answer": pred.get("answer", "") if answered else "",
+            "reply": pred.get("reply", "") if answered else "",
             "confidence": pred.get("confidence", 0.0),
             "citation": pred.get("citation") if answered else None}
