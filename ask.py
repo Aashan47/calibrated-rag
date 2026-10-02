@@ -28,9 +28,16 @@ def answer(agent, tau, question):
         if d.get("citation"):
             snippet = d["citation"]["text"][:240].replace("\n", " ")
             print(f"  cited passage: {snippet}...")
+    elif pred.get("error"):
+        print(f"\n  MODEL UNAVAILABLE: {pred['error']}")
+        print("  (this is an API failure, not an abstention; retry or check the key/quota)")
     else:
-        why = "the agent judged it unanswerable" if not pred.get("answerable") \
-            else f"confidence {pred.get('confidence',0):.2f} < calibrated threshold {tau:.2f}"
+        if any(s.get("action") == "abstain" for s in pred.get("steps", [])):
+            why = "the agent judged the answer is not in these documents"
+        elif not pred.get("answerable"):
+            why = f"only {pred.get('votes',0)} of {agent.n} samples found a supported answer"
+        else:
+            why = f"confidence {pred.get('confidence',0):.2f} < calibrated threshold {tau:.2f}"
         print("\n  ABSTAINED: I can't answer this reliably from the documents.")
         print(f"  reason: {why}")
 

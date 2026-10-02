@@ -1,0 +1,323 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>calibrated-rag-agent</title>
+<style>
+:root{
+  --bg:#0b1118;--panel:#111a24;--panel2:#0d151e;--line:#1f2b38;--line2:#2a3949;
+  --ink:#e6edf3;--mut:#8b9bab;--dim:#5f6f7f;--accent:#4da3ff;--ok:#3ddc97;--warn:#f0b64b;
+  --bad:#ff6b6b;--mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);
+  font:14.5px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Inter,sans-serif}
+a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}
+button{font:inherit;cursor:pointer}
+code,.mono{font-family:var(--mono);font-size:12.5px}
+
+/* top bar */
+.top{display:flex;align-items:center;gap:16px;padding:12px 24px;border-bottom:1px solid var(--line);
+  background:var(--panel);position:sticky;top:0;z-index:5}
+.brand{font-weight:700;letter-spacing:.2px;font-size:15px}
+.brand small{color:var(--mut);font-weight:400;margin-left:8px}
+.top .spacer{flex:1}
+.sys{display:flex;gap:8px;flex-wrap:wrap}
+.tag{font-size:11.5px;color:var(--mut);border:1px solid var(--line2);border-radius:6px;padding:3px 8px;
+  background:var(--panel2)}
+.tag b{color:var(--ink);font-weight:600}
+.tag.live b{color:var(--ok)}
+.tag.down b{color:var(--bad)}
+
+/* intro */
+.intro{padding:22px 24px 10px;border-bottom:1px solid var(--line)}
+.intro h1{margin:0 0 6px;font-size:21px}
+.intro p{margin:0;color:var(--mut);max-width:980px}
+.intro p b{color:var(--ink)}
+details.diff{margin-top:12px;max-width:980px}
+details.diff summary{cursor:pointer;color:var(--accent);font-weight:600;font-size:13.5px;list-style:none}
+details.diff summary::before{content:"▸ ";color:var(--dim)}
+details.diff[open] summary::before{content:"▾ "}
+table.cmp{border-collapse:collapse;margin-top:10px;width:100%;font-size:13.5px}
+table.cmp th,table.cmp td{text-align:left;padding:7px 10px;border-top:1px solid var(--line);vertical-align:top}
+table.cmp th{color:var(--mut);font-weight:600}
+table.cmp td:first-child{color:var(--mut);white-space:nowrap}
+table.cmp td:last-child{color:var(--ink)}
+
+/* layout */
+.main{display:grid;grid-template-columns:340px 1fr;gap:0;min-height:calc(100vh - 60px)}
+@media(max-width:900px){.main{grid-template-columns:1fr}.side{border-right:0;border-bottom:1px solid var(--line);max-height:360px}}
+.side{border-right:1px solid var(--line);background:var(--panel);display:flex;flex-direction:column;
+  position:sticky;top:60px;height:calc(100vh - 60px);overflow:hidden}
+.side .hd{padding:14px 16px 10px;border-bottom:1px solid var(--line)}
+.side .hd h2{margin:0 0 2px;font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--mut)}
+.side .hd .src{font-weight:600}
+.side .hd .cnt{color:var(--mut);font-size:12.5px}
+.side input{width:100%;margin-top:10px;padding:8px 10px;border-radius:7px;border:1px solid var(--line2);
+  background:var(--panel2);color:var(--ink);font-size:13px}
+.side input:focus{outline:none;border-color:var(--accent)}
+.plist{overflow:auto;flex:1;padding:6px 8px 20px}
+.pas{padding:8px 10px;border-radius:8px;border:1px solid transparent;cursor:pointer;margin-bottom:2px}
+.pas:hover{background:var(--panel2);border-color:var(--line)}
+.pas .t{font-size:13px;font-weight:600;display:flex;gap:8px;align-items:baseline}
+.pas .t .id{color:var(--dim);font-family:var(--mono);font-size:11px;min-width:30px}
+.pas .m{color:var(--dim);font-size:11.5px;margin-left:38px}
+.pas .body{display:none;margin:8px 0 2px 38px;color:#c3cfdb;font-size:13px;line-height:1.5}
+.pas.open .body{display:block}
+.pas.hit{border-color:var(--line2);background:var(--panel2)}
+.pas.hit .id{color:var(--accent)}
+.pas.cited{border-color:rgba(61,220,151,.5);background:rgba(61,220,151,.06)}
+.pas.cited .id{color:var(--ok)}
+.legend{padding:8px 16px;border-top:1px solid var(--line);font-size:11.5px;color:var(--dim);display:flex;gap:14px}
+.legend i{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:5px;vertical-align:middle}
+
+.content{padding:20px 24px 60px;max-width:960px}
+.ask{display:flex;gap:10px}
+.ask input{flex:1;padding:12px 14px;border-radius:9px;border:1px solid var(--line2);background:var(--panel);
+  color:var(--ink);font-size:15px}
+.ask input:focus{outline:none;border-color:var(--accent)}
+.ask button{padding:12px 20px;border:0;border-radius:9px;background:var(--accent);color:#06121f;font-weight:700}
+.ask button:disabled{opacity:.5;cursor:default}
+.ex{margin-top:12px;display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media(max-width:700px){.ex{grid-template-columns:1fr}}
+.ex .grp h3{margin:0 0 6px;font-size:11.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--mut)}
+.chip{display:inline-block;font-size:12.5px;color:var(--mut);border:1px solid var(--line2);border-radius:20px;
+  padding:4px 11px;margin:0 6px 6px 0;background:transparent;cursor:pointer}
+.chip:hover{color:var(--ink);border-color:var(--accent)}
+
+.card{margin-top:18px;border:1px solid var(--line);border-radius:12px;background:var(--panel);padding:18px 20px;display:none}
+.card.show{display:block}
+.pill{display:inline-block;font-size:11.5px;font-weight:700;letter-spacing:.05em;padding:3px 10px;border-radius:20px}
+.pill.ok{background:rgba(61,220,151,.14);color:var(--ok)}
+.pill.ab{background:rgba(240,182,75,.14);color:var(--warn)}
+.pill.er{background:rgba(255,107,107,.14);color:var(--bad)}
+.q{color:var(--mut);font-size:13px;margin-top:10px}
+.ans{font-size:21px;font-weight:700;margin:6px 0 4px}
+.ans.small{font-size:16px;font-weight:600}
+.why{color:var(--mut);font-size:13.5px}
+.why b{color:var(--ink)}
+.lbl{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--mut);margin-top:16px}
+.conf{margin-top:8px}
+.bar{position:relative;height:10px;border-radius:6px;background:var(--line);overflow:visible}
+.bar .fill{height:100%;border-radius:6px;background:var(--accent)}
+.bar .tau{position:absolute;top:-4px;width:2px;height:18px;background:var(--warn)}
+.bar .tau:after{content:"threshold";position:absolute;top:18px;left:-26px;font-size:10.5px;color:var(--warn);white-space:nowrap}
+.confrow{display:flex;justify-content:space-between;font-size:12.5px;color:var(--mut);margin-top:20px}
+.cite{margin-top:8px;padding:12px 14px;border-left:3px solid var(--ok);background:var(--panel2);border-radius:6px;
+  font-size:13.5px;color:#c9d6e2;line-height:1.55}
+.cite .ct{font-size:12px;color:var(--mut);margin-bottom:4px}
+.cite .ct b{color:var(--ok);font-family:var(--mono)}
+.trace{margin-top:8px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:10px 14px}
+.trace ol{margin:0;padding-left:0;list-style:none}
+.trace li{display:grid;grid-template-columns:26px 1fr;gap:8px;padding:5px 0;border-top:1px dashed var(--line);font-size:13px}
+.trace li:first-child{border-top:0}
+.trace .n{color:var(--dim);font-family:var(--mono);font-size:11.5px;padding-top:2px}
+.trace .k{display:inline-block;font-family:var(--mono);font-size:11px;padding:1px 6px;border-radius:4px;margin-right:6px;
+  background:var(--line);color:var(--mut)}
+.trace .k.search{color:var(--accent)}.trace .k.decide{color:var(--ink)}.trace .k.abstain{color:var(--warn)}
+.trace .k.answer{color:var(--ok)}.trace .k.error{color:var(--bad)}
+.trace .r{color:var(--dim)}
+.meta{display:flex;gap:16px;flex-wrap:wrap;color:var(--dim);font-size:12px;margin-top:14px}
+.cmp{margin-top:16px;border-top:1px solid var(--line);padding-top:12px}
+.cmp button{background:transparent;border:1px solid var(--line2);color:var(--mut);border-radius:7px;padding:7px 12px;font-size:13px}
+.cmp button:hover{color:var(--ink);border-color:var(--accent)}
+.cmp .out{margin-top:10px;display:none}
+.cmp .out.show{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:700px){.cmp .out.show{grid-template-columns:1fr}}
+.cmp .box{border:1px solid var(--line);border-radius:8px;padding:10px 12px;background:var(--panel2);font-size:13.5px}
+.cmp .box h4{margin:0 0 6px;font-size:11.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--mut)}
+.cmp .box .n{color:var(--dim);font-size:12px;margin-top:6px}
+
+.foot{margin-top:28px;border-top:1px solid var(--line);padding-top:14px;color:var(--mut);font-size:12.5px}
+.foot .row{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+.foot h4{margin:0 0 4px;font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--dim)}
+.foot b{color:var(--ink);font-weight:600}
+.foot code{background:var(--panel2);padding:1px 5px;border-radius:4px}
+.err{color:var(--bad)}
+</style>
+</head>
+<body>
+
+<div class="top">
+  <div class="brand">calibrated-rag-agent <small>document question-answering that abstains</small></div>
+  <div class="spacer"></div>
+  <div class="sys" id="sys"></div>
+</div>
+
+<div class="intro">
+  <h1>Ask a question. It answers only from the documents on the left, cites the passage, or tells you it can't.</h1>
+  <p>Every answer comes with a <b>confidence</b> (agreement across several independent samples) checked against a
+  <b>threshold calibrated so that errors on answered questions stay under a target rate</b>. When the documents
+  don't support an answer, the agent <b>abstains and says why</b> instead of guessing. Every search, decision and
+  citation it made is shown.</p>
+  <details class="diff">
+    <summary>How this differs from asking ChatGPT or another chat assistant</summary>
+    <table class="cmp">
+      <tr><th></th><th>Chat assistant</th><th>This agent</th></tr>
+      <tr><td>Where answers come from</td><td>Its training data, mixed with anything you paste; you can't tell which</td>
+          <td>Only the passages in the knowledge base on the left. Nothing else.</td></tr>
+      <tr><td>When the answer isn't there</td><td>Usually produces a plausible answer anyway</td>
+          <td>Abstains, and reports whether the agent judged it absent or the confidence was too low</td></tr>
+      <tr><td>Confidence</td><td>None, or a self-reported number that is poorly calibrated</td>
+          <td>Agreement across N samples; the answer/abstain threshold is calibrated on held-out data for a target error rate</td></tr>
+      <tr><td>Evidence</td><td>Sometimes a link</td><td>The exact passage, highlighted in the knowledge base</td></tr>
+      <tr><td>Visibility</td><td>A reply</td><td>The full trace: each search query, each decision, each failed call</td></tr>
+      <tr><td>Retrieval</td><td>Single lookup, if any</td><td>An agent loop: it judges whether the passages suffice and reformulates the query when they don't</td></tr>
+    </table>
+    <p style="margin-top:8px">Why it matters: for a company handbook, a contract, or a ticket history, a confident wrong
+    answer is worse than no answer. This is a small, measured implementation of the "know when not to answer" layer
+    (<a id="evalLink" href="#">evaluation and numbers</a>).</p>
+  </details>
+</div>
+
+<div class="main">
+  <aside class="side">
+    <div class="hd">
+      <h2>Knowledge base</h2>
+      <div class="src" id="srcName">loading…</div>
+      <div class="cnt" id="srcCount"></div>
+      <input id="filter" placeholder="Filter passages…">
+    </div>
+    <div class="plist" id="plist"></div>
+    <div class="legend"><span><i style="background:var(--accent)"></i>retrieved for last question</span>
+      <span><i style="background:var(--ok)"></i>cited</span></div>
+  </aside>
+
+  <section class="content">
+    <div class="ask">
+      <input id="q" placeholder="Ask something about these documents…" autofocus>
+      <button id="go">Ask</button>
+    </div>
+    <div class="ex" id="ex"></div>
+
+    <div class="card" id="card"></div>
+
+    <div class="foot" id="foot"></div>
+  </section>
+</div>
+
+<script>
+const $=s=>document.querySelector(s);
+const esc=s=>(s??'').toString().replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+let META=null, CORPUS=[], lastQ='';
+
+async function init(){
+  const [m,c]=await Promise.all([fetch('/meta').then(r=>r.json()),fetch('/corpus').then(r=>r.json())]);
+  META=m; CORPUS=c.passages;
+  $('#evalLink').href=m.repo+'/blob/main/EVALUATION.md';
+  renderSys(m); renderCorpus(); renderExamples(m); renderFoot(m);
+}
+function renderSys(m){
+  const parts=[
+    `<span class="tag">model <b>${esc(m.model)}</b></span>`,
+    `<span class="tag">retrieval <b>${esc(m.retriever)}</b></span>`,
+    `<span class="tag">samples <b>${m.n_samples}</b></span>`,
+    `<span class="tag">threshold <b>${m.threshold.toFixed(2)}</b></span>`,
+    `<span class="tag ${m.model_key?'live':'down'}">api key <b>${m.model_key?'present':'missing'}</b></span>`,
+    `<a class="tag" href="${esc(m.repo)}" target="_blank">source ↗</a>`];
+  $('#sys').innerHTML=parts.join('');
+}
+function renderCorpus(f=''){
+  const q=f.trim().toLowerCase();
+  const items=CORPUS.filter(p=>!q||p.title.toLowerCase().includes(q)||p.text.toLowerCase().includes(q));
+  $('#plist').innerHTML=items.map(p=>`<div class="pas" id="p${p.id}" onclick="this.classList.toggle('open')">
+      <div class="t"><span class="id">#${p.id}</span><span>${esc(p.title)}</span></div>
+      <div class="m">${p.words} words${p.source?' · '+esc(p.source):''}</div>
+      <div class="body">${esc(p.text)}</div></div>`).join('');
+}
+$('#filter').addEventListener('input',e=>renderCorpus(e.target.value));
+function renderExamples(m){
+  if(!m.examples){$('#ex').innerHTML='';return;}
+  const grp=(t,arr)=>`<div class="grp"><h3>${t}</h3>${arr.map(e=>`<span class="chip" onclick="askQ(${JSON.stringify(e)})">${esc(e)}</span>`).join('')}</div>`;
+  $('#ex').innerHTML=grp('Answerable from these documents',m.examples.answerable)+
+                     grp('Not in these documents (should abstain)',m.examples.unanswerable);
+}
+function renderFoot(m){
+  const cal=m.calibration;
+  $('#foot').innerHTML=`<div class="row">
+    <div><h4>Abstention threshold</h4><b>${m.threshold.toFixed(2)}</b> · ${esc(m.threshold_source)}</div>
+    <div><h4>Calibration</h4>${cal?`target error <b>${(cal.alpha*100).toFixed(0)}%</b> · held-out selective error <b>${(cal.selective_error*100).toFixed(1)}%</b> · ECE <b>${cal.ece.toFixed(3)}</b> · on ${esc(cal.dataset)}, n=${cal.n}`:'no calibration file for this corpus (using default threshold)'}</div>
+    <div><h4>Agent</h4>up to <b>${m.max_steps}</b> decision steps · <b>${m.n_samples}</b> answer samples · ~${m.n_samples+1}+ model calls per question</div>
+    <div><h4>Your own documents</h4><code>python ingest.py ./docs --name "Handbook"</code> then <code>python serve.py</code></div>
+  </div>`;
+}
+
+function askQ(q){$('#q').value=q;ask();}
+$('#go').onclick=ask; $('#q').addEventListener('keydown',e=>{if(e.key==='Enter')ask();});
+
+async function ask(){
+  const q=$('#q').value.trim(); if(!q) return;
+  lastQ=q;
+  const go=$('#go'),card=$('#card');
+  go.disabled=true; card.classList.add('show');
+  card.innerHTML=`<span class="pill" style="background:var(--line);color:var(--mut)">WORKING</span>
+    <div class="q">${esc(q)}</div><div class="why" style="margin-top:8px">searching the knowledge base, letting the agent judge the passages, then sampling ${META?META.n_samples:5} answers for a confidence…</div>`;
+  document.querySelectorAll('.pas').forEach(p=>p.classList.remove('hit','cited'));
+  try{
+    const r=await fetch('/ask',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({question:q})});
+    const d=await r.json();
+    if(d.error && !d.status) throw new Error(d.error);
+    render(d);
+  }catch(e){card.innerHTML=`<span class="pill er">ERROR</span><div class="ans small err" style="margin-top:8px">${esc(e.message||e)}</div>`;}
+  go.disabled=false;
+}
+
+function traceHTML(steps){
+  if(!steps||!steps.length) return '';
+  const row=(i,k,cls,txt,r)=>`<li><span class="n">${i}</span><span><span class="k ${cls}">${k}</span>${txt}${r?` <span class="r">· ${esc(r)}</span>`:''}</span></li>`;
+  return `<div class="lbl">Agent trace</div><div class="trace"><ol>`+steps.map((s,i)=>{
+    const n=i+1;
+    if(s.action==='search') return row(n,'search','search',`“${esc(s.query)}” → ${s.ids.length} passage(s), ${s.new} new: ${s.ids.map(x=>'#'+x).join(' ')}`);
+    if(s.action==='decide'&&s.error) return row(n,'error','error',`decision call failed (${esc(s.error)}); proceeding to an answer attempt`);
+    if(s.action==='decide'&&s.next==='search') return row(n,'decide','decide',`passages insufficient → reformulate: “${esc(s.query)}”`,s.reason);
+    if(s.action==='decide') return row(n,'decide','answer',`passages sufficient → answer`,s.reason);
+    if(s.action==='abstain') return row(n,'abstain','abstain',`answer is not in this corpus → stop`,s.reason);
+    if(s.action==='sample') return row(n,'sample',s.errors?'error':'answer',`${s.n} answer samples: ${s.votes} said answerable${s.errors?`, ${s.errors} failed (${esc(s.error)})`:''}`);
+    return row(n,s.action,'',JSON.stringify(s));
+  }).join('')+`</ol></div>`;
+}
+
+function render(d){
+  const card=$('#card');
+  const pct=Math.round(d.confidence*100), tpct=Math.round(d.threshold*100);
+  const confBlock=`<div class="lbl">Confidence vs threshold</div><div class="conf">
+      <div class="bar"><div class="fill" style="width:${pct}%"></div><div class="tau" style="left:${tpct}%"></div></div>
+      <div class="confrow"><span>${d.votes_total?`${d.votes} of ${d.votes_total} samples said answerable · ${(d.confidence).toFixed(2)} agreed on the top answer`:`confidence ${d.confidence.toFixed(2)}`}</span><span>answer if ≥ ${d.threshold.toFixed(2)}</span></div></div>`;
+  let head='';
+  if(d.status==='answered'){
+    head=`<span class="pill ok">ANSWERED</span><div class="q">${esc(d.question)}</div><div class="ans">${esc(d.answer)}</div>
+      <div class="why">${esc(d.reason)}</div>`+confBlock+
+      (d.citation?`<div class="lbl">Cited passage</div><div class="cite"><div class="ct">passage <b>#${d.citation.id}</b> · ${esc(d.citation.title)} · <a href="#" onclick="jump(${d.citation.id});return false">open in knowledge base</a></div>${esc(d.citation.text)}</div>`:'');
+  }else if(d.status==='abstained'){
+    head=`<span class="pill ab">ABSTAINED</span><div class="q">${esc(d.question)}</div>
+      <div class="ans small">I can't answer this reliably from these documents.</div>
+      <div class="why"><b>${esc(d.reason_title)}</b> — ${esc(d.reason)}</div>`+(d.reason_code!=='not_in_documents'?confBlock:'');
+  }else{
+    head=`<span class="pill er">MODEL UNAVAILABLE</span><div class="q">${esc(d.question)}</div>
+      <div class="ans small err">${esc(d.reason)}</div>
+      <div class="why">This is an infrastructure failure, not an abstention: the agent never got a judgement from the model. Retry, or check the API key and quota.</div>`;
+  }
+  card.innerHTML=head+traceHTML(d.steps)+
+    `<div class="meta"><span>${d.latency_ms} ms</span><span>${d.llm_calls} model call(s)</span><span>${d.retrieved.length} passage(s) gathered: ${d.retrieved.map(x=>'#'+x).join(' ')}</span><span>retrieval: ${esc(META.retriever)}</span></div>`+
+    `<div class="cmp"><button onclick="compare()">Compare: what a plain LLM says with no documents</button><div class="out" id="cmpOut"></div></div>`;
+  (d.retrieved||[]).forEach(id=>{const el=document.getElementById('p'+id);if(el)el.classList.add('hit');});
+  if(d.citation){const el=document.getElementById('p'+d.citation.id);if(el)el.classList.add('cited');}
+}
+function jump(id){const el=document.getElementById('p'+id);if(!el)return;el.classList.add('open');el.scrollIntoView({behavior:'smooth',block:'center'});}
+
+async function compare(){
+  const out=$('#cmpOut'); out.classList.add('show');
+  out.innerHTML=`<div class="box"><h4>Plain LLM (no documents, no abstention policy)</h4>asking…</div>
+                 <div class="box"><h4>This agent</h4>see above</div>`;
+  const r=await fetch('/compare',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({question:lastQ})});
+  const d=await r.json();
+  out.innerHTML=`<div class="box"><h4>Plain LLM (no documents, no abstention policy)</h4>${d.error?`<span class="err">${esc(d.error)}</span>`:esc(d.answer)}
+      <div class="n">same model, asked the question directly. Nothing here can be checked against a source, and nothing stops it from answering questions the documents never covered.</div></div>
+    <div class="box"><h4>This agent</h4>Answers only from the knowledge base, with the passage shown and a calibrated abstain decision (see above).
+      <div class="n">On general trivia the plain model often knows the answer. The difference shows on private material (a handbook, a contract, a ticket log) where the model has nothing to draw on but the documents, and the honest answer is sometimes "not here".</div></div>`;
+}
+init();
+</script>
+</body>
+</html>

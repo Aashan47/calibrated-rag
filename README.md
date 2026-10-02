@@ -26,7 +26,8 @@ accuracy but **calibration, hallucination rate, and the accuracy/coverage tradeo
 - 📉 **Conformal abstention** with a risk target — a reliability guarantee on answered questions
 - 🔎 **Citations** — every answer points to the passage that supports it
 - 🔀 **Hybrid retrieval** — TF-IDF + Gemini embeddings fused with Reciprocal Rank Fusion (lexical fallback)
-- 🖥️ **Web demo + CLI** — ask in the browser and watch the agent's trace, then answer or abstain (`serve.py`)
+- 🖥️ **Web interface + CLI** — see the knowledge base it answers from, the answer or the stated reason for abstaining, confidence vs threshold, the cited passage, and the full agent trace; compare side-by-side with the same model given no documents (`serve.py`)
+- 🚦 **Outages are not abstentions** — a failed or rate-limited model call is reported as "model unavailable", never as "the agent judged it unanswerable"
 - 📁 **Bring your own docs** — index a folder and query it, not just the benchmark (`ingest.py`)
 - 📊 **Measured, not claimed** — selective accuracy, ECE, hallucination reduction, accuracy-vs-coverage
 - ✅ **Tested + CI** — offline unit tests (incl. the agent loop) run in GitHub Actions
@@ -149,8 +150,13 @@ export GEMINI_API_KEY=...        # or GEMENI_API_KEY
 ```
 
 ```bash
-# Web demo — ask in the browser, see the answer/abstention, confidence, and citation
-python serve.py                          # open http://localhost:8000
+# Web interface — open http://localhost:8000
+#   left: every passage the agent can answer from (filterable; retrieved + cited ones highlight)
+#   right: answer or abstention with its reason, confidence vs calibrated threshold, cited
+#          passage, the agent's trace (each search, decision, failed call), and a
+#          "compare with a plain LLM" button that asks the same model with no documents
+python serve.py
+# JSON API: GET /meta, GET /corpus, POST /ask {"question"}, POST /compare {"question"}
 
 # Ask from the CLI
 python ask.py "Who was yersinia pestis named for?"    # -> Alexandre Yersin (with citation)
@@ -175,8 +181,15 @@ python -m unittest discover -s tests -v
 ```
 
 Config via env: `CRAG_MODEL` (LLM), `CRAG_EMBED_MODEL` (embeddings), `CRAG_RETRIEVER=tfidf|hybrid`,
-`CRAG_THRESHOLD` (abstention cutoff for custom corpora). The LLM provider is isolated to
-`calibrated_rag/llm.py` (one function), so moving to Claude or GPT is a small change.
+`CRAG_THRESHOLD` (abstention cutoff for custom corpora), `CRAG_SAMPLES` (answer samples per
+question, default 5), `CRAG_MAX_STEPS` (decision-loop bound, default 3). The LLM provider is
+isolated to `calibrated_rag/llm.py`, so moving to Claude or GPT is a small change.
+
+**Rate limits.** A question costs ~1 decision call + `CRAG_SAMPLES` answer samples (plus one per
+reformulation). Gemini's free tier allows roughly 10–15 requests/minute, so on a free key set
+`CRAG_SAMPLES=3` (the Render blueprint does). If the API rate-limits or the key is bad, the
+interface reports **model unavailable** with the HTTP status — it never passes an outage off as an
+abstention.
 
 ### Deploy
 
@@ -202,13 +215,14 @@ calibrated_rag/
   corpus.py       # load the SQuAD slice OR an ingested custom corpus
   data.py         # SQuAD 2.0 loader
   trace.py        # append-only JSONL query trace (observability)
+  ui/index.html   # the web interface (served by serve.py; no build step, no CDN)
 evaluate.py       # full QA evaluation → results/results.json + charts
 retrieval_eval.py # retrieval ablation (lexical vs hybrid recall@k)
 eval/
   stats.py        # bootstrap confidence intervals (uncertainty on every metric)
   behavior.py     # agent behaviour, reformulation recovery, citation groundedness, calibration CIs
   ablation.py     # agent decision loop vs single-shot baseline — does the loop earn its calls?
-serve.py          # zero-dep web demo (HTTP API + single-page UI)
+serve.py          # zero-dep web interface + JSON API (/meta, /corpus, /ask, /compare)
 ask.py            # interactive CLI
 ingest.py         # index your own .txt/.md docs
 tests/            # offline tests: unit (test_core) + end-to-end eval gate (test_eval_gate)

@@ -1,9 +1,15 @@
-# Render Blueprint — one-click deploy of the web demo.
+# Render Blueprint — one-click deploy of the web interface.
 # New -> Blueprint -> pick this repo -> paste your GEMINI_API_KEY. That's it.
 #
-# The demo runs TF-IDF retrieval (no embedding calls -> instant boot, fast queries) over a
-# small committed corpus, and a lenient abstention threshold so it answers readily while
-# still abstaining on unanswerable questions. The LLM still needs the key.
+# The hosted demo runs TF-IDF retrieval (no embedding calls -> instant boot) over the small
+# committed corpus, with a lenient abstention threshold so it answers readily while still
+# abstaining on unanswerable questions.
+#
+# Rate limits: each question costs ~1 decision call + CRAG_SAMPLES answer samples. Gemini's
+# free tier allows roughly 10-15 requests/minute for gemini-2.5-flash, so with 5 samples two
+# quick questions can hit HTTP 429. CRAG_SAMPLES=3 keeps a question under that budget; a
+# paid-tier key can go back to 5 (the calibrated setting). When the API does rate-limit, the
+# UI says "model unavailable" explicitly rather than pretending the agent abstained.
 services:
   - type: web
     name: calibrated-rag-agent
@@ -12,6 +18,7 @@ services:
     buildCommand: "echo 'no build step — standard library only'"
     startCommand: "python serve.py"
     autoDeploy: true
+    healthCheckPath: /health
     envVars:
       - key: GEMINI_API_KEY        # set this in the dashboard (secret)
         sync: false
@@ -19,5 +26,7 @@ services:
         value: tfidf
       - key: CRAG_THRESHOLD        # lenient demo threshold (answers readily; still abstains)
         value: "0.6"
+      - key: CRAG_SAMPLES          # fewer answer samples per question for free-tier keys
+        value: "3"
       - key: PYTHON_VERSION
         value: "3.12.6"

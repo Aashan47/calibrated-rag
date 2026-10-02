@@ -148,6 +148,25 @@ class TestAgentLoop(unittest.TestCase):
         self.assertEqual(p["confidence"], 0.0)
         self.assertTrue(any(s["action"] == "abstain" for s in p["steps"]))
 
+    def test_model_outage_is_reported_as_error_not_abstention(self):
+        # decision call AND every answer sample fail -> the prediction must say "error",
+        # the trace must not claim a judgement was made, and decide() must not answer.
+        def failing_complete(prompt, **kw):
+            raise llm.LLMError("rate limited by the model API (HTTP 429)")
+        def failing_answer(q, ctx, temperature=0.0):
+            return {"answerable": False, "answer": "", "cite": 0, "confidence": 0.0,
+                    "error": "rate limited by the model API (HTTP 429)"}
+        self._orig = (llm.complete, llm.answer_or_abstain)
+        llm.complete = failing_complete
+        llm.answer_or_abstain = failing_answer
+        p = self._agent().predict("how much did revenue grow")
+        self.assertIn("429", p["error"])
+        self.assertEqual(p["errors"], 2)                    # both samples failed
+        dec = [s for s in p["steps"] if s["action"] == "decide"][0]
+        self.assertIn("error", dec)                          # trace is honest about it
+        self.assertFalse(agent_mod.decide(p, 0.0)["answered"])
+        self.assertEqual(p["llm_calls"], 3)                  # 1 decision + 2 samples
+
     def test_does_not_repeat_a_tried_query(self):
         # agent keeps proposing the SAME query; loop must stop and answer, not spin
         self._patch(['{"action":"search","query":"how much did revenue grow"}'] * 5)

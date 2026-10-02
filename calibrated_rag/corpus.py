@@ -20,16 +20,27 @@ RESULTS = os.path.join(os.path.dirname(__file__), "..", "results", "results.json
 DEFAULT_THRESHOLD = 0.6
 
 
-def load_contexts() -> tuple[list[str], str, bool]:
-    """Return (passages, source_name, is_custom)."""
+def load_corpus() -> dict:
+    """Return {'contexts', 'name', 'is_custom', 'sources'} where `sources` is a per-passage
+    origin label (file name for an ingested corpus, None for the demo slice)."""
     if os.path.exists(INDEX):     # a corpus you ingested
         obj = json.load(open(INDEX))
-        return obj["contexts"], obj.get("name", "custom documents"), True
+        return {"contexts": obj["contexts"], "name": obj.get("name", "custom documents"),
+                "is_custom": True, "sources": obj.get("sources")}
     if os.path.exists(DEMO):      # committed demo corpus — instant, no download
         obj = json.load(open(DEMO))
-        return obj["contexts"], obj.get("name", "SQuAD 2.0 passages (demo corpus)"), False
+        return {"contexts": obj["contexts"],
+                "name": obj.get("name", "SQuAD 2.0 passages (demo corpus)"),
+                "is_custom": False, "sources": None}
     contexts, _ = squad.load()    # fallback: download the SQuAD slice
-    return contexts, "SQuAD 2.0 passages (demo corpus)", False
+    return {"contexts": contexts, "name": "SQuAD 2.0 passages (demo corpus)",
+            "is_custom": False, "sources": None}
+
+
+def load_contexts() -> tuple[list[str], str, bool]:
+    """Return (passages, source_name, is_custom)."""
+    c = load_corpus()
+    return c["contexts"], c["name"], c["is_custom"]
 
 
 def abstention_threshold(is_custom: bool) -> float:
