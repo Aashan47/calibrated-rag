@@ -83,6 +83,7 @@ sample votes, failed calls) and `llm_calls`, which the console and CLI surface.
 | `helpdesk_agent/embeddings.py` | Gemini embeddings, on-disk cache, graceful fallback |
 | `helpdesk_agent/conformal.py` | split-conformal selective-prediction threshold |
 | `helpdesk_agent/corpus.py` | load the help centre (`knowledge_base/`) or an ingested corpus; threshold selection |
+| `helpdesk_agent/kb.py` | the editable help centre: validated add/edit/delete, stable article ids, agent rebuilt per change, per-run snapshots, reset/export, optional write-through |
 | `helpdesk_agent/datasets.py` | labelled sets: `helpdesk` (tickets.json) and `squad` |
 | `helpdesk_agent/metrics.py` | EM/F1, ECE, reliability bins |
 | `helpdesk_agent/charts.py` | hand-written SVG charts |
@@ -97,6 +98,12 @@ sample votes, failed calls) and `llm_calls`, which the console and CLI surface.
 
 - **Channels:** `serve.py` exposes `POST /ticket`; an email or chat adapter posts the message and
   routes `resolved` to the customer and `escalated` (with the hand-off) to the queue.
+- **Human queue:** `GET /queue` is every `escalated` ticket with its hand-off note; `close` takes it
+  out once a person has answered, `reopen` re-runs it (typically after the help centre was fixed).
+- **Help centre:** `kb.py` keeps the articles and rebuilds the agent on every change. Each run takes
+  a snapshot, so an edit mid-run cannot shift a citation. Edits are in memory per process (the demo
+  host has an ephemeral disk); `HDA_KB_WRITE=1` mirrors them to `knowledge_base/` as markdown, and a
+  real deployment would put the same interface over a database.
 - **Tools:** a second corpus, an order-status lookup or an account API would register in
   `tools.py`; the loop can choose them without changes to its logic.
 - **Model:** `llm.py` hides the provider behind two functions.

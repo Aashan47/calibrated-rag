@@ -12,6 +12,10 @@ under a target rate.**
 **Live demo:** [helpdesk-agent-6wri.onrender.com](https://helpdesk-agent-6wri.onrender.com/) — a ticket inbox over a
 fictional SaaS help centre; pick a ticket and watch the agent work. (Free tier: first load can take ~30 s to wake.)
 
+![The console: a ticket resolved from an article that was written in the console a moment earlier](docs/console.png)
+
+![The human queue: escalated tickets with the agent's hand-off note and the fix-and-re-run actions](docs/human-queue.png)
+
 Most support bots are a chat model with the help centre pasted in. They answer every ticket, and on
 the tickets the help centre doesn't cover they answer *confidently and wrongly* — a made-up refund
 window, an SLA that doesn't exist. For a business, one of those costs more than ten tickets routed
@@ -26,6 +30,8 @@ selective prediction), so *the rate of wrong replies is a number you set, not a 
 - 🧠 **Self-consistency confidence** — agreement across N independent reply samples (clustered by meaning), not the model's self-reported number
 - 🚦 **Outages are never escalations** — a rate-limited or failed call is reported as "model unavailable", with the HTTP status, never as "not covered"
 - 🖥️ **Support console** — a ticket inbox: the agent handles tickets while you watch each step stream live (search → judge → draft → decide); send the reply or escalate; browse the help centre; compare with a plain chatbot
+- 🙋 **Human queue** — every escalation lands in a queue with the agent's hand-off note (why it stopped, what it searched, closest articles); re-run it after fixing the help centre, or answer and close it
+- ✍️ **Editable help centre, re-indexed live** — add, edit or delete articles from the console; the agent searches the new article on its very next run, so an escalation becomes "write the missing article → re-run → auto-resolved" without a restart
 - 📁 **Your own help centre** — `ingest.py` indexes a folder of articles; label ~50 of your tickets and calibrate the threshold for *your* domain
 - 📊 **Measured** — calibration, groundedness, agent behaviour, an ablation against single-shot, and bootstrap CIs; also run on SQuAD 2.0 as a public benchmark
 - 🪶 **Zero dependencies** — standard library only: retrieval, server, UI, charts, API client
@@ -129,13 +135,21 @@ python -m eval.ablation; python -m eval.behavior        # loop vs single-shot; b
 python -m unittest discover -s tests -v                 # offline: unit, eval gate, KB consistency
 ```
 
-JSON API: `GET /meta`, `GET /articles`, `GET /inbox`, `POST /inbox {"message"}`, `GET /inbox/<id>/stream`
-(server-sent events, one per agent step), `POST /inbox/<id>/send|escalate|reopen`, `POST /ticket {"message"}`
+JSON API: `GET /meta`, `GET /inbox`, `GET /inbox/<id>`, `POST /inbox {"message"}`, `GET /inbox/<id>/stream`
+(server-sent events, one per agent step), `POST /inbox/<id>/send|escalate|close|reopen`, `GET /queue`
+(escalated tickets with hand-off notes), `GET /articles`, `POST /articles {"title","category","text"}`,
+`PUT|DELETE /articles/<id>`, `POST /articles/reset`, `GET /articles/export`, `POST /ticket {"message"}`
 (one-shot), `POST /compare {"message"}`, `GET /health`.
 
 Config via env: `HDA_MODEL`, `HDA_EMBED_MODEL`, `HDA_RETRIEVER=tfidf|hybrid`, `HDA_THRESHOLD`
 (override τ), `HDA_SAMPLES` (reply samples per ticket, default 5), `HDA_MAX_STEPS` (loop bound,
-default 3). The provider is isolated to `helpdesk_agent/llm.py`.
+default 3), `HDA_KB_WRITE=1` (also write console edits to `knowledge_base/` as markdown; without it
+edits live for the process and can be exported or reset). The provider is isolated to
+`helpdesk_agent/llm.py`.
+
+**Help-centre edits and the calibration.** The shipped threshold was calibrated on the shipped
+articles. Editing the help centre does not re-calibrate it; the console says so while edits are live.
+For a changed help centre, label tickets and re-run `evaluate.py` (below).
 
 **Rate limits.** A ticket costs ~1 decision call + `HDA_SAMPLES` samples. Gemini's free tier allows
 roughly 10–15 requests/minute, so on a free key set `HDA_SAMPLES=3` (the Render blueprint does).
@@ -166,6 +180,9 @@ helpdesk_agent/
   embeddings.py   # Gemini embeddings with on-disk cache + graceful fallback
   conformal.py    # split-conformal selective-prediction threshold
   corpus.py       # help centre / ingested corpus loader; threshold selection
+  kb.py           # the editable help centre: validated edits, stable ids, live re-index, snapshots
+  inbox.py        # ticket state machine (new → handling → auto-resolved/escalated → sent/closed)
+  guards.py       # input, load and output guardrails (size caps, rate limit, grounding check)
   datasets.py     # labelled sets: helpdesk tickets, SQuAD 2.0
   metrics.py      # EM/F1, ECE, reliability bins
   charts.py       # hand-written SVG charts

@@ -17,6 +17,7 @@ body{display:flex;flex-direction:column}
 a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}
 button{font:inherit;cursor:pointer}
 .mono{font-family:var(--mono);font-size:12px}
+[hidden]{display:none!important}
 
 /* top */
 .top{display:flex;align-items:center;gap:12px;height:52px;padding:0 20px;background:var(--panel);border-bottom:1px solid var(--line);flex:none}
@@ -26,6 +27,7 @@ button{font:inherit;cursor:pointer}
 .chip b{color:var(--ink);font-weight:600}
 .dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--ok);margin-right:5px;vertical-align:1px}.dot.off{background:var(--bad)}
 .lnk{font-size:12px;color:var(--mut)}
+#kbToggle{display:none}
 
 /* stats strip */
 .strip{display:flex;align-items:center;gap:10px;padding:10px 20px;border-bottom:1px solid var(--line);background:var(--panel);flex-wrap:wrap;flex:none}
@@ -38,7 +40,8 @@ button{font:inherit;cursor:pointer}
 
 /* layout */
 .main{display:grid;grid-template-columns:290px 1fr 300px;grid-template-rows:minmax(0,1fr);flex:1;min-height:0}
-@media(max-width:1100px){.main{grid-template-columns:270px 1fr}.kb{display:none}}
+@media(max-width:1100px){.main{grid-template-columns:270px 1fr}.kb{display:none}#kbToggle{display:inline-block}
+  .main.kbopen .kb{display:flex;position:fixed;top:52px;right:0;bottom:0;width:320px;z-index:15;box-shadow:-8px 0 30px rgba(0,0,0,.12);border-left:1px solid var(--line)}}
 @media(max-width:760px){.main{grid-template-columns:1fr;grid-template-rows:auto;flex:none}.inbox{max-height:48vh}.pane{height:auto}.chip,.lnk{display:none}.brand span{display:none}}
 .pane{display:flex;flex-direction:column;min-height:0;border-right:1px solid var(--line);background:var(--panel)}
 .pane:last-child{border-right:0}
@@ -48,21 +51,32 @@ button{font:inherit;cursor:pointer}
 .sbtn{font-size:12px;padding:5px 10px;border-radius:6px;border:1px solid var(--line2);background:var(--panel);color:var(--ink);font-weight:600;white-space:nowrap}
 .sbtn:hover{border-color:var(--accent);color:var(--accent)}.sbtn:disabled{opacity:.45;cursor:default}
 
+/* tabs */
+.tabs{display:flex;gap:2px;padding:4px;background:var(--soft);border-radius:8px}
+.tab{flex:1;border:0;background:none;border-radius:6px;padding:5px 8px;font-size:12.5px;font-weight:600;color:var(--mut);display:flex;justify-content:center;gap:6px;align-items:center}
+.tab.on{background:var(--panel);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.08)}
+.tab .b{font-size:10.5px;font-weight:700;min-width:18px;padding:0 5px;border-radius:9px;background:var(--line);color:var(--mut);line-height:17px}
+.tab.on .b{background:var(--accent2);color:var(--accent)}.tab .b.warn{background:var(--warn2);color:var(--warn)}
+.tabwrap{padding:8px 12px 0}
+
 /* inbox */
 .tk{padding:10px 16px;border-bottom:1px solid var(--line);cursor:pointer;border-left:3px solid transparent}
 .tk:hover{background:var(--soft)}.tk.sel{background:var(--accent2);border-left-color:var(--accent)}
 .tk .r1{display:flex;justify-content:space-between;gap:8px;align-items:baseline}
 .tk .who{font-weight:600;font-size:13px}.tk .ago{color:var(--dim);font-size:11px}
 .tk .sub{font-size:12.5px;color:var(--mut);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tk .rsn{font-size:11.5px;color:var(--warn);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .st{display:inline-block;font-size:10.5px;font-weight:600;padding:2px 7px;border-radius:10px;margin-top:5px}
 .st.new{background:var(--soft);color:var(--mut)}.st.handling{background:var(--accent2);color:var(--accent)}
 .st.auto-resolved,.st.sent{background:var(--ok2);color:var(--ok)}.st.escalated{background:var(--warn2);color:var(--warn)}.st.error{background:var(--bad2);color:var(--bad)}
+.st.closed{background:var(--soft);color:var(--mut);text-decoration:line-through}
 .compose{padding:10px 16px 12px;border-top:1px solid var(--line);background:var(--soft)}
 .compose textarea{width:100%;min-height:54px;padding:8px 10px;border-radius:6px;border:1px solid var(--line2);background:var(--panel);font:inherit;font-size:13px;resize:vertical}
-.compose textarea:focus,.kb input:focus{outline:none;border-color:var(--accent)}
+.compose textarea:focus,.kb input:focus,.ed input:focus,.ed textarea:focus,.ed select:focus{outline:none;border-color:var(--accent)}
 .compose .row{display:flex;gap:6px;margin-top:6px}
 .compose input{flex:1;min-width:0;padding:6px 9px;border-radius:6px;border:1px solid var(--line2);background:var(--panel);font:inherit;font-size:12.5px}
 .compose button{flex:none;padding:6px 12px;border:0;border-radius:6px;background:var(--accent);color:#fff;font-weight:600;font-size:12.5px}
+.qempty{padding:28px 18px;color:var(--dim);font-size:13px;text-align:center;line-height:1.5}
 
 /* ticket */
 .ticket{padding:18px 24px 40px;max-width:860px}
@@ -75,7 +89,19 @@ button{font:inherit;cursor:pointer}
 .btn:hover{border-color:var(--accent)}.btn.pri{background:var(--accent);border-color:var(--accent);color:#fff}
 .btn.ok{background:var(--ok);border-color:var(--ok);color:#fff}.btn.warn{border-color:var(--warn);color:var(--warn)}
 .btn.sm{padding:5px 10px;font-size:12px}.btn:disabled{opacity:.45;cursor:default}
-.actions{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+.actions{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;align-items:center}
+.qact{margin-top:14px;padding-top:12px;border-top:1px solid var(--line)}
+.qact .t{font-size:12.5px;color:var(--mut);margin-bottom:8px}.qact .t b{color:var(--ink)}
+
+/* queue board */
+.board{padding:18px 24px 40px;max-width:900px}
+.board h1{font-size:17px;margin:0}.board .sub{color:var(--mut);font-size:13px;margin:3px 0 14px}
+.qc{border:1px solid var(--line);border-radius:12px;background:var(--panel);padding:13px 16px;margin-bottom:10px}
+.qc .r1{display:flex;justify-content:space-between;gap:10px;align-items:baseline}
+.qc .who{font-weight:600}.qc .who span{color:var(--mut);font-weight:400}.qc .ago{color:var(--dim);font-size:11.5px}
+.qc .q{color:#374151;font-size:13px;margin-top:4px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.qc .why{margin-top:8px}.qc .closest{font-size:12.5px;color:var(--mut);margin-top:4px}
+.qc .actions{margin-top:10px}
 
 /* trace */
 .trace{margin-top:6px;border:1px solid var(--line);border-radius:8px;background:var(--panel);min-height:36px}
@@ -94,7 +120,7 @@ button{font:inherit;cursor:pointer}
 /* outcome */
 .out{margin-top:14px;border:1px solid var(--line);border-radius:12px;background:var(--panel);padding:16px 18px}
 .pill{display:inline-block;font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px}
-.pill.ok{background:var(--ok2);color:var(--ok)}.pill.ab{background:var(--warn2);color:var(--warn)}.pill.er{background:var(--bad2);color:var(--bad)}
+.pill.ok{background:var(--ok2);color:var(--ok)}.pill.ab{background:var(--warn2);color:var(--warn)}.pill.er{background:var(--bad2);color:var(--bad)}.pill.mu{background:var(--soft);color:var(--mut)}
 .bubble{margin-top:10px;padding:12px 15px;border-radius:12px;background:var(--accent2);border:1px solid #cfdcff;font-size:14.5px;line-height:1.55;position:relative}
 .bubble .who{font-size:10.5px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--accent);margin-bottom:3px}
 .bubble.hold{background:var(--warn2);border-color:#f3dfb8}.bubble.hold .who{color:var(--warn)}
@@ -128,20 +154,34 @@ button{font:inherit;cursor:pointer}
 .art:hover{background:var(--soft)}
 .art .t{font-size:12.5px;font-weight:500;display:flex;gap:7px;align-items:baseline}
 .art .t .id{color:var(--dim);font-family:var(--mono);font-size:10.5px;min-width:24px}
-.art .body{display:none;margin:6px 0 2px 31px;color:#4b5563;font-size:12.5px;line-height:1.5}
-.art.open .body{display:block}
+.art .t .tag{margin-left:auto;font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;padding:1px 5px;border-radius:4px;background:var(--accent2);color:var(--accent)}
+.art .body{display:none;margin:6px 0 2px 31px;color:#4b5563;font-size:12.5px;line-height:1.5;white-space:pre-wrap}
+.art .aact{display:none;margin:6px 0 2px 31px;font-size:12px}.art .aact a{margin-right:10px}.art .aact a.del{color:var(--bad)}
+.art.open .body,.art.open .aact{display:block}
 .art.hit{border-left-color:var(--accent);background:var(--accent2)}.art.hit .id{color:var(--accent)}
 .art.cited{border-left-color:var(--ok);background:var(--ok2)}.art.cited .id{color:var(--ok)}
-.legend{padding:7px 14px;border-top:1px solid var(--line);font-size:11px;color:var(--dim);display:flex;gap:12px}
+.legend{padding:7px 14px;border-top:1px solid var(--line);font-size:11px;color:var(--dim);display:flex;gap:12px;align-items:center}
 .legend i{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:4px;vertical-align:middle}
+.legend .sp{flex:1}.legend a{font-size:11px}.legend a.reset{color:var(--warn)}
+.kbnote{padding:6px 14px;background:var(--warn2);color:var(--warn);font-size:11.5px;border-bottom:1px solid #f3dfb8}
 
-/* modal */
+/* modals */
 .modal{position:fixed;inset:0;background:rgba(17,24,39,.35);display:none;align-items:center;justify-content:center;z-index:20}
 .modal.show{display:flex}
-.modal .card{background:var(--panel);border-radius:14px;padding:22px 26px;max-width:560px;width:92%;box-shadow:0 20px 60px rgba(0,0,0,.18)}
+.modal .card{background:var(--panel);border-radius:14px;padding:22px 26px;max-width:560px;width:92%;box-shadow:0 20px 60px rgba(0,0,0,.18);max-height:92vh;overflow:auto}
+.modal .card.wide{max-width:640px}
 .modal h3{margin:0 0 10px;font-size:16px}
 .modal ol{margin:0;padding-left:18px;color:#374151}.modal li{margin:6px 0}
 .modal .x{float:right;background:none;border:0;color:var(--mut);font-size:18px}
+.ed label{display:block;font-size:12px;font-weight:600;color:var(--mut);margin-top:12px}
+.ed input,.ed select,.ed textarea{display:block;width:100%;margin-top:4px;padding:7px 10px;border-radius:6px;border:1px solid var(--line2);font:inherit;font-size:13.5px;background:var(--panel)}
+.ed textarea{min-height:170px;resize:vertical;line-height:1.5}
+.ed .row{display:flex;gap:8px}.ed .row>*{flex:1;min-width:0}
+.ed .cnt{font-size:11px;color:var(--dim);text-align:right;margin-top:3px}
+.ed .ctx{margin-top:8px;padding:9px 12px;border-radius:8px;background:var(--soft);border:1px solid var(--line);font-size:13px;color:#374151}
+.ed .ctx b{display:block;font-size:10.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--dim);margin-bottom:2px}
+.ed .note{font-size:12px;color:var(--dim);flex:1}
+.ed .done{padding:10px 0 0;font-size:14px}
 </style>
 </head>
 <body>
@@ -150,7 +190,8 @@ button{font:inherit;cursor:pointer}
   <div class="brand">helpdesk-agent<span id="co"></span></div>
   <div class="sp"></div>
   <span class="chip" id="chipKey"></span>
-  <span class="chip">threshold <b id="chipTau"></b></span>
+  <span class="chip" id="chipTauWrap">threshold <b id="chipTau"></b></span>
+  <button class="sbtn" id="kbToggle">Help centre</button>
   <a class="lnk" id="repo" target="_blank">GitHub ↗</a>
 </div>
 
@@ -161,23 +202,28 @@ button{font:inherit;cursor:pointer}
   <button class="how" onclick="document.getElementById('modal').classList.add('show')">How it works</button>
 </div>
 
-<div class="main">
+<div class="main" id="main">
   <aside class="pane inbox">
-    <div class="hd"><h2>Inbox<small id="inboxCount"></small></h2><button class="sbtn" id="runAll">▶ Run all</button></div>
+    <div class="tabwrap"><div class="tabs">
+      <button class="tab on" id="tabInbox" onclick="setView('inbox')">Inbox <span class="b" id="nNew">0</span></button>
+      <button class="tab" id="tabQueue" onclick="setView('queue')">Human queue <span class="b warn" id="nQueue">0</span></button>
+    </div></div>
+    <div class="hd"><h2 id="listTitle">Inbox<small id="inboxCount"></small></h2><button class="sbtn" id="runAll">▶ Run all</button></div>
     <div class="scroll" id="tklist"></div>
-    <div class="compose">
+    <div class="compose" id="compose">
       <textarea id="cMsg" maxlength="2000" placeholder="New ticket: paste a customer message…"></textarea>
       <div class="row"><input id="cName" placeholder="Customer"><input id="cSubj" placeholder="Subject"><button id="cAdd">Add</button></div>
     </div>
   </aside>
 
-  <section class="pane"><div class="scroll"><div class="ticket" id="ticket"><div class="empty">Select a ticket, or add one.</div></div></div></section>
+  <section class="pane"><div class="scroll" id="mid"><div class="ticket" id="ticket"><div class="empty">Select a ticket, or add one.</div></div></div></section>
 
   <aside class="pane kb">
-    <div class="hd"><h2>Help centre<small id="kbCount"></small></h2></div>
+    <div class="hd"><h2>Help centre<small id="kbCount"></small></h2><button class="sbtn" onclick="openEditor({})">+ Add article</button></div>
+    <div class="kbnote" id="kbNote" hidden></div>
     <div style="padding:8px 14px;border-bottom:1px solid var(--line)"><input id="filter" placeholder="Search…"></div>
     <div class="scroll" id="alist"></div>
-    <div class="legend"><span><i style="background:var(--accent)"></i>retrieved</span><span><i style="background:var(--ok)"></i>cited</span></div>
+    <div class="legend"><span><i style="background:var(--accent)"></i>retrieved</span><span><i style="background:var(--ok)"></i>cited</span><span class="sp"></span><a href="/articles/export" download>Export</a><a href="#" class="reset" id="kbReset" hidden onclick="resetKB();return false">Reset edits</a></div>
   </aside>
 </div>
 
@@ -187,10 +233,30 @@ button{font:inherit;cursor:pointer}
     <ol>
       <li><b>Search</b> the help centre for the ticket, then let the agent <b>judge</b>: enough to reply, search again with a reworded query, or stop because it isn't covered.</li>
       <li><b>Draft</b> several independent replies; confidence = how many agree on the same fact.</li>
-      <li><b>Reply</b> only if confidence clears a threshold <b>calibrated on 68 labelled tickets</b> for a target error rate; otherwise <b>escalate</b> with a hand-off note.</li>
+      <li><b>Reply</b> only if confidence clears a threshold <b>calibrated on 68 labelled tickets</b> for a target error rate; otherwise <b>escalate</b> with a hand-off note into the <b>human queue</b>.</li>
+      <li>From the queue, <b>write the missing article</b> and re-run: the help centre is re-indexed live, and the ticket resolves.</li>
       <li>A failed model call is shown as <b>model unavailable</b>, never as an escalation.</li>
     </ol>
     <p style="color:var(--mut);font-size:13px;margin:12px 0 0">Unlike a chatbot on the same model, it never answers from memory. Try an uncovered ticket and press <b>Compare with a plain chatbot</b>. Numbers and method: <a id="evalLink" href="#" target="_blank">EVALUATION.md</a>.</p>
+  </div>
+</div>
+
+<div class="modal" id="editor" onclick="if(event.target===this)closeEditor()">
+  <div class="card wide ed"><button class="x" onclick="closeEditor()">×</button>
+    <h3 id="edH">New article</h3>
+    <div id="edForm">
+      <div class="ctx" id="edCtx" hidden><b>Customer asked</b><span id="edCtxT"></span></div>
+      <label>Title<input id="edT" maxlength="120" placeholder="e.g. Startup discounts"></label>
+      <div class="row">
+        <label>Category<select id="edC" onchange="document.getElementById('edCN').hidden=this.value!=='__new'"></select></label>
+        <label id="edCNL">New category<input id="edCN" placeholder="e.g. Partnerships" maxlength="60" hidden></label>
+      </div>
+      <label>Article<textarea id="edB" maxlength="6000" placeholder="Write it the way you would in the help centre: state the facts the agent may reply with (numbers, limits, who to contact)."></textarea></label>
+      <div class="cnt" id="edCnt"></div>
+      <div class="err" id="edErr" style="font-size:13px;margin-top:6px"></div>
+      <div class="actions"><button class="btn pri" id="edSave" onclick="saveArticle()">Save &amp; re-index</button><button class="btn" onclick="closeEditor()">Cancel</button><span class="note" id="edNote"></span></div>
+    </div>
+    <div id="edDone" hidden></div>
   </div>
 </div>
 
@@ -198,14 +264,15 @@ button{font:inherit;cursor:pointer}
 const $=s=>document.querySelector(s);
 const esc=s=>(s??'').toString().replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const pct=x=>(x*100).toFixed(x*100<10&&x>0?1:0)+'%';
-let META=null, ART=[], TICKETS=[], SESSION={}, SEL=null, ES=null, RESULT={}, QUEUE=[];
+let META=null, ART=[], KB={}, CATS={}, TICKETS=[], SESSION={}, SEL=null, ES=null, RESULT={}, QUEUE=[], VIEW='inbox', EDIT=null;
 
 async function init(){
   const [m,a,ib]=await Promise.all([fetch('/meta').then(r=>r.json()),fetch('/articles').then(r=>r.json()),fetch('/inbox').then(r=>r.json())]);
-  META=m; ART=a.articles; TICKETS=ib.tickets; SESSION=ib.session;
+  META=m; applyArticles(a); TICKETS=ib.tickets; SESSION=ib.session;
   $('#co').textContent=m.company||''; $('#repo').href=m.repo; $('#evalLink').href=m.repo+'/blob/main/EVALUATION.md';
   $('#chipTau').textContent=m.threshold.toFixed(2);
   $('#chipKey').innerHTML=`<span class="dot ${m.model_key?'':'off'}"></span><b>${esc(m.model)}</b>${m.model_key?'':' · no API key'}`;
+  $('#edNote').textContent=KB.write_through?'Saved to knowledge_base/ and re-indexed immediately.':'Kept for this session on the demo server and re-indexed immediately. Export to keep it.';
   renderStats(); renderInbox(); renderArticles();
 }
 function renderStats(){
@@ -216,42 +283,113 @@ function renderStats(){
     <span class="stat"><b>${pct(c.selective_error)}</b><span>error, target ≤ ${pct(c.alpha)}</span></span>`;
 }
 function ago(ts){const d=Date.now()/1000-ts;if(d<60)return 'now';if(d<3600)return Math.round(d/60)+'m';if(d<86400)return Math.round(d/3600)+'h';return Math.round(d/86400)+'d';}
+const nice=s=>s.replace('-',' ');
+
+/* views */
+function setView(v){ if(ES) return; VIEW=v; $('#tabInbox').classList.toggle('on',v==='inbox'); $('#tabQueue').classList.toggle('on',v==='queue');
+  $('#compose').hidden=v==='queue'; $('#runAll').hidden=v==='queue';
+  if(v==='queue') SEL=null;                 // the queue tab opens on the board; pick a ticket from it
+  renderInbox(); if(SEL==null) renderMid(); }
+function renderMid(){ if(VIEW==='queue') renderBoard(); else $('#mid').innerHTML=`<div class="ticket" id="ticket"><div class="empty">Select a ticket, or add one.</div></div>`; }
 function renderInbox(){
-  const n=TICKETS.filter(t=>t.status==='new').length, s=SESSION||{};
-  const done=(s['auto-resolved']||0)+(s.sent||0)+(s.escalated||0); $('#inboxCount').textContent=`${n} new · ${done} handled`;
+  const n=TICKETS.filter(t=>t.status==='new').length, q=TICKETS.filter(t=>t.status==='escalated'), s=SESSION||{};
+  const done=(s['auto-resolved']||0)+(s.sent||0)+(s.escalated||0)+(s.closed||0);
+  $('#nNew').textContent=n; $('#nQueue').textContent=q.length;
   $('#runAll').disabled=!n||!!ES;
-  $('#tklist').innerHTML=TICKETS.map(t=>`<div class="tk ${SEL===t.id?'sel':''}" onclick="select(${t.id})">
+  const list=VIEW==='queue'?q:TICKETS;
+  if(VIEW==='queue'){ $('#listTitle').innerHTML=`Human queue<small>${q.length} waiting · ${s.closed||0} closed</small>`; }
+  else $('#listTitle').innerHTML=`Inbox<small>${n} new · ${done} handled</small>`;
+  $('#tklist').innerHTML=list.map(t=>`<div class="tk ${SEL===t.id?'sel':''}" onclick="select(${t.id})">
     <div class="r1"><span class="who">${esc(t.customer)}</span><span class="ago">${ago(t.received)}</span></div>
-    <div class="sub">${esc(t.subject||t.message)}</div><span class="st ${t.status}">${t.status.replace('-',' ')}</span></div>`).join('');
+    <div class="sub">${esc(t.subject||t.message)}</div>${VIEW==='queue'?`<div class="rsn">${esc(whyQueued(t).title)}</div>`:`<span class="st ${t.status}">${nice(t.status)}</span>`}</div>`).join('')
+    ||(VIEW==='queue'?`<div class="qempty">Nothing waiting for a human.<br>Escalated tickets land here with the agent's hand-off note.</div>`:'');
 }
+function whyQueued(t){ const o=t.outcome;
+  if(!o) return {title:'Escalated without running the agent',reason:'A teammate sent it straight to the queue.'};
+  if(o.status==='escalated') return {title:o.reason_title||'Escalated',reason:o.reason||''};
+  if(o.status==='resolved') return {title:'Escalated by a teammate',reason:`The agent had drafted a reply from “${o.citation||'an article'}”; a teammate chose to hand it over instead.`};
+  return {title:'Escalated after a model error',reason:o.reason||''}; }
+function renderBoard(){
+  const q=TICKETS.filter(t=>t.status==='escalated');
+  $('#mid').innerHTML=`<div class="board"><h1>Human queue</h1><div class="sub">${q.length?`${q.length} ticket${q.length===1?'':'s'} the agent would not answer. Each carries why, what it searched, and the closest articles. Fix the help centre and re-run, or answer and close.`:'Nothing waiting. When the agent escalates a ticket it lands here with a hand-off note.'}</div>
+    ${q.map(t=>{const w=whyQueued(t),ho=(t.outcome||{}).handoff||{};return `<div class="qc"><div class="r1"><span class="who">${esc(t.subject||'(no subject)')} <span>· ${esc(t.customer)}</span></span><span class="ago">${ago(t.received)} ago</span></div>
+      <div class="q">${esc(t.message)}</div>
+      <div class="why"><b>${esc(w.title)}.</b> ${esc(w.reason)}</div>
+      ${(ho.closest||[]).length?`<div class="closest">Closest articles: ${ho.closest.map(c=>`<a href="#" onclick="jump(${c.id});return false">${esc(c.title)}</a>`).join(' · ')}</div>`:''}
+      <div class="actions"><button class="btn sm" onclick="select(${t.id})">Open</button>${queueButtons(t)}</div></div>`;}).join('')}</div>`;
+}
+function queueButtons(t){ return `<button class="btn pri sm" onclick="openEditor({ticket:${t.id}})">Write an article</button><button class="btn sm" onclick="reopen(${t.id},true)">Re-run agent</button><button class="btn sm" onclick="closeTicket(${t.id})">Close · answered by a human</button>`; }
+
+/* help centre */
+function applyArticles(d){ ART=d.articles; KB=d.kb||{}; CATS=d.categories||{}; if(META) META.kb=KB;
+  $('#kbCount').textContent=`${ART.length} articles${KB.edits?` · ${KB.edits} edit${KB.edits===1?'':'s'}`:''}`;
+  $('#kbNote').hidden=!KB.edits; $('#kbNote').textContent=`Edited this session (${KB.edits}). The calibrated threshold refers to the shipped articles.`;
+  $('#kbReset').hidden=!KB.edits; const tw=$('#chipTauWrap'); if(tw) tw.title=KB.edits?'Help centre edited this session; calibration refers to the shipped articles.':''; }
 function renderArticles(f=''){
   const q=f.trim().toLowerCase(); const items=ART.filter(p=>!q||p.title.toLowerCase().includes(q)||p.text.toLowerCase().includes(q));
   let html='',cat=null;
   for(const p of items){ if(p.category!==cat){cat=p.category;html+=`<div class="cat">${esc(p.category_name)}</div>`;}
-    html+=`<div class="art" id="a${p.id}" onclick="this.classList.toggle('open')"><div class="t"><span class="id">#${p.id}</span><span>${esc(p.title)}</span></div><div class="body">${esc(p.text)}</div></div>`;}
-  $('#alist').innerHTML=html||'<div class="cat">no matches</div>'; $('#kbCount').textContent=`${ART.length} articles`;
+    html+=`<div class="art" id="a${p.id}" onclick="if(event.target.tagName!=='A')this.classList.toggle('open')"><div class="t"><span class="id">#${p.id}</span><span>${esc(p.title)}</span>${p.state?`<span class="tag">${p.state}</span>`:''}</div><div class="body">${esc(p.text)}</div><div class="aact"><a href="#" onclick="openEditor({id:${p.id}});return false">Edit</a><a href="#" class="del" onclick="delArticle(${p.id});return false">Delete</a></div></div>`;}
+  $('#alist').innerHTML=html||'<div class="cat">no matches</div>';
 }
 $('#filter').addEventListener('input',e=>renderArticles(e.target.value));
+$('#kbToggle').onclick=()=>$('#main').classList.toggle('kbopen');
 function markKB(ret,cite){document.querySelectorAll('.art').forEach(p=>p.classList.remove('hit','cited'));
   (ret||[]).forEach(id=>{const el=document.getElementById('a'+id);if(el)el.classList.add('hit');});
   if(cite!=null){const el=document.getElementById('a'+cite);if(el)el.classList.add('cited');}}
-function jump(id){const el=document.getElementById('a'+id);if(!el)return;el.classList.add('open');el.scrollIntoView({behavior:'smooth',block:'center'});}
+function jump(id){const el=document.getElementById('a'+id);if(!el){toast('That article is no longer in the help centre.');return;}el.classList.add('open');el.scrollIntoView({behavior:'smooth',block:'center'});}
+
+function openEditor(o){ EDIT=o||{}; const a=EDIT.id!=null?ART.find(x=>x.id===EDIT.id):null; const t=EDIT.ticket!=null?TICKETS.find(x=>x.id===EDIT.ticket):null;
+  $('#edForm').hidden=false; $('#edDone').hidden=true; $('#edErr').textContent='';
+  $('#edH').textContent=a?`Edit article #${a.id}`:(t?'Write the missing article':'New article');
+  $('#edCtx').hidden=!t; if(t) $('#edCtxT').textContent=t.message;
+  const sel=$('#edC'); sel.innerHTML=Object.entries(CATS).map(([k,v])=>`<option value="${esc(k)}">${esc(v)}</option>`).join('')+'<option value="__new">New category…</option>';
+  $('#edT').value=a?a.title:(t?(t.subject||''):''); $('#edB').value=a?a.text:''; $('#edCN').value=''; $('#edCN').hidden=true;
+  if(a) sel.value=a.category; else if(t&&t.outcome&&t.outcome.handoff&&t.outcome.handoff.closest&&t.outcome.handoff.closest[0]){const c=ART.find(x=>x.id===t.outcome.handoff.closest[0].id); if(c) sel.value=c.category;}
+  count(); $('#editor').classList.add('show'); setTimeout(()=>(a?$('#edB'):$('#edT')).focus(),50); }
+function count(){ const n=$('#edB').value.length; $('#edCnt').textContent=`${n} / ${(KB.limits||{}).body||6000} characters${n&&n<((KB.limits||{}).body_min||20)?' · too short':''}`; }
+$('#edB').addEventListener('input',count);
+function closeEditor(){ $('#editor').classList.remove('show'); EDIT=null; }
+async function saveArticle(){
+  const cat=$('#edC').value, body={title:$('#edT').value,text:$('#edB').value,category:cat==='__new'?$('#edCN').value:cat,category_name:cat==='__new'?$('#edCN').value:undefined};
+  if(cat==='__new'&&!body.category.trim()){$('#edErr').textContent='Give the new category a name.';return;}
+  $('#edSave').disabled=true;
+  const d=EDIT.id!=null?await post(`/articles/${EDIT.id}`,body,'PUT'):await post('/articles',body);
+  $('#edSave').disabled=false;
+  if(d.error){$('#edErr').textContent=d.error;return;}
+  applyArticles(d); renderArticles($('#filter').value); const a=d.article;
+  if(EDIT.ticket!=null){ const tid=EDIT.ticket; $('#edForm').hidden=true; $('#edDone').hidden=false;
+    $('#edDone').innerHTML=`<div class="done">Article <b>#${a.id} ${esc(a.title)}</b> added and indexed. The agent will search it on the next run.</div><div class="actions"><button class="btn pri" onclick="closeEditor();reopen(${tid},true)">Re-run the ticket</button><button class="btn" onclick="closeEditor()">Done</button></div>`; }
+  else { closeEditor(); toast(`Article #${a.id} ${EDIT&&EDIT.id!=null?'updated':'added'} · help centre re-indexed`); jump(a.id); }
+}
+async function delArticle(id){ const a=ART.find(x=>x.id===id); if(!a||!confirm(`Delete “${a.title}”? The agent will stop replying from it.`)) return;
+  const d=await post(`/articles/${id}`,{},'DELETE'); if(d.error){toast(d.error);return;} applyArticles(d); renderArticles($('#filter').value); toast(`Article #${id} deleted · help centre re-indexed`); }
+async function resetKB(){ if(!confirm('Discard every edit made this session and go back to the shipped help centre?')) return;
+  const d=await post('/articles/reset'); if(d.error){toast(d.error);return;} applyArticles(d); renderArticles($('#filter').value); toast(`Help centre reset · ${d.discarded} edit${d.discarded===1?'':'s'} discarded`); }
 
 /* ticket */
-function select(id){ if(ES) return; SEL=id; renderInbox(); const t=TICKETS.find(x=>x.id===id); renderTicket(t);
-  if(t.status==='new') handle(id); else if(RESULT[id]){renderTrace(RESULT[id].steps,true);renderOutcome(t,RESULT[id]);} else markKB([],null); }
+async function select(id){ if(ES) return; SEL=id; const t=TICKETS.find(x=>x.id===id); if(!t) return;
+  if(VIEW==='queue'&&t.status!=='escalated') VIEW='inbox', setView('inbox');
+  renderInbox(); renderTicket(t);
+  if(t.status==='new'){handle(id);return;}
+  if(!RESULT[id]&&t.status!=='handling'){ try{const d=await fetch(`/inbox/${id}`).then(r=>r.json()); if(d.result) RESULT[id]=d.result; if(d.ticket) Object.assign(t,d.ticket);}catch(e){} if(SEL!==id) return; renderTicket(t); }
+  if(RESULT[id]){renderTrace(RESULT[id].steps,true);renderOutcome(t,RESULT[id]);}
+  else { markKB([],null); if(t.status==='escalated'||t.status==='closed') $('#outcome').innerHTML=manualCard(t); }
+}
+function manualCard(t){ return `<div class="out"><span class="pill ${t.status==='closed'?'mu':'ab'}">${t.status==='closed'?'Closed · answered by a human':'Escalated by you'}</span><div class="why">${t.status==='closed'?'Out of the queue.':'In the human queue without the agent running.'}</div>${t.status==='escalated'?queueBlock(t):''}</div>`; }
+function queueBlock(t){ return `<div class="qact"><div class="t"><b>In the human queue.</b> Write the article the agent was missing and re-run, or answer it yourself and close.</div><div class="actions" style="margin-top:0">${queueButtons(t)}</div></div>`; }
 function renderTicket(t){
-  $('#ticket').innerHTML=`<div class="thead"><div><div class="subj">${esc(t.subject||'(no subject)')}</div><div class="from">${esc(t.customer)} · ${ago(t.received)} ago · <span class="st ${t.status}" style="margin:0">${t.status.replace('-',' ')}</span></div></div><div id="topActions"></div></div>
+  $('#mid').innerHTML=`<div class="ticket" id="ticket"><div class="thead"><div><div class="subj">${esc(t.subject||'(no subject)')}</div><div class="from">${esc(t.customer)} · ${ago(t.received)} ago · <span class="st ${t.status}" style="margin:0">${nice(t.status)}</span></div></div><div id="topActions"></div></div>
     <div class="msg">${esc(t.message)}</div>
     <div class="lbl">Agent <span id="working"></span></div><div class="trace"><ol id="traceList"></ol></div>
-    <div id="outcome"></div>`;
+    <div id="outcome"></div></div>`;
   const a=$('#topActions');
   if(t.status==='new'||t.status==='error') a.innerHTML=`<button class="btn pri sm" onclick="handle(${t.id})">${t.status==='error'?'Retry':'Handle'}</button>`;
-  else if(t.status!=='handling') a.innerHTML=`<button class="btn sm" onclick="reopen(${t.id})">Re-run</button>`;
+  else if(t.status!=='handling'&&t.status!=='closed'&&t.status!=='sent') a.innerHTML=`<button class="btn sm" onclick="reopen(${t.id})">Re-run</button>`;
 }
 function stepLine(s,i){
   const row=(k,cls,txt,r)=>`<li><span class="n">${i}</span><span><span class="k ${cls}">${k}</span>${txt}${r?` <span class="r">· ${esc(r)}</span>`:''}</span></li>`;
-  if(s.action==='search'){const q=s.query.length>80?s.query.slice(0,78).trimEnd()+'…':s.query; return row('search','search',`“${esc(q)}” → ${s.ids.map(x=>'#'+x).join(' ')}`);}
+  if(s.action==='search'){const q=s.query.length>80?s.query.slice(0,78).trimEnd()+'…':s.query; return row('search','search',`“${esc(q)}” → ${s.ids.length?s.ids.map(x=>'#'+x).join(' '):'nothing'}`);}
   if(s.action==='decide'&&s.error) return row('error','error',`decision call failed: ${esc(s.error)}`);
   if(s.action==='decide'&&s.next==='search') return row('decide','decide',`not enough → search again: “${esc(s.query)}”`,s.reason);
   if(s.action==='decide') return row('decide','answer',`enough to reply`,s.reason);
@@ -260,10 +398,10 @@ function stepLine(s,i){
   if(s.action==='sample') return row('draft',s.errors?'error':'answer',`${s.votes}/${s.n} found an answer · ${(s.agreement*100).toFixed(0)}% agree${s.errors?` · ${s.errors} failed: ${esc(s.error)}`:''}`);
   return row(s.action,'',JSON.stringify(s));
 }
-function renderTrace(steps,done){ $('#traceList').innerHTML=steps.map((s,i)=>stepLine(s,i+1)).join(''); $('#working').innerHTML=done?'':'<span class="spin"></span>';
+function renderTrace(steps,done){ const el=$('#traceList'); if(!el) return; el.innerHTML=steps.map((s,i)=>stepLine(s,i+1)).join(''); $('#working').innerHTML=done?'':'<span class="spin"></span>';
   const ret=[]; steps.forEach(s=>{if(s.action==='search')s.ids.forEach(x=>{if(!ret.includes(x))ret.push(x);});}); markKB(ret,null); }
 function handle(id){
-  if(ES) return; const t=TICKETS.find(x=>x.id===id); t.status='handling'; renderInbox(); renderTicket(t);
+  if(ES) return; const t=TICKETS.find(x=>x.id===id); if(VIEW==='queue'){VIEW='inbox';setView('inbox');SEL=id;} t.status='handling'; renderInbox(); renderTicket(t);
   const steps=[]; renderTrace(steps,false);
   ES=new EventSource(`/inbox/${id}/stream`);
   ES.addEventListener('step',e=>{steps.push(JSON.parse(e.data));renderTrace(steps,false);});
@@ -283,42 +421,46 @@ function confHTML(d){ const p=Math.round(d.confidence*100),t=Math.round(d.thresh
     <div class="confrow"><span>${d.votes_total?`${d.votes}/${d.votes_total} drafts found an answer · ${(d.confidence*100).toFixed(0)}% agree`:`${(d.confidence*100).toFixed(0)}%`}</span><span>${d.threshold>0?`threshold ${d.threshold.toFixed(2)}`:'threshold 0.00 · any supported answer passes'}</span></div>`; }
 function renderOutcome(t,d){
   let h='';
-  if(d.status==='resolved'){ const sent=t.status==='sent';
-    h=`<div class="out"><span class="pill ok">${sent?'Reply sent':'Resolved · reply ready'}</span>
-      <div class="bubble"><div class="who">Reply</div>${esc(d.reply)}<button class="copy" onclick="copyText(${t.id},'reply',this)">copy</button></div>
-      <div class="actions">${sent?'':`<button class="btn ok" onclick="send(${t.id})">Send reply</button><button class="btn warn" onclick="escalate(${t.id})">Escalate instead</button>`}</div>`+confHTML(d)+
-      (d.citation?`<div class="lbl">Source</div><div class="cite"><div class="ct"><b>#${d.citation.id}</b> ${esc(d.citation.title)} · ${esc(d.citation.category)} · <a href="#" onclick="jump(${d.citation.id});return false">open</a></div><div class="tx">${esc(d.citation.text)}</div><div class="more" onclick="this.parentNode.classList.toggle('open');this.textContent=this.parentNode.classList.contains('open')?'less':'more'">more</div></div>`:'');
+  if(d.status==='resolved'){ const sent=t.status==='sent', esc_=t.status==='escalated'||t.status==='closed';
+    h=`<div class="out"><span class="pill ${esc_?(t.status==='closed'?'mu':'ab'):'ok'}">${sent?'Reply sent':esc_?(t.status==='closed'?'Closed · answered by a human':'Escalated by you · draft kept for reference'):'Resolved · reply ready'}</span>
+      <div class="bubble"><div class="who">${esc_?'Agent draft (not sent)':'Reply'}</div>${esc(d.reply)}<button class="copy" onclick="copyText(${t.id},'reply',this)">copy</button></div>
+      <div class="actions">${sent||esc_?'':`<button class="btn ok" onclick="send(${t.id})">Send reply</button><button class="btn warn" onclick="escalate(${t.id})">Escalate instead</button>`}</div>`+confHTML(d)+
+      (d.citation?`<div class="lbl">Source</div><div class="cite"><div class="ct"><b>#${d.citation.id}</b> ${esc(d.citation.title)} · ${esc(d.citation.category)} · <a href="#" onclick="jump(${d.citation.id});return false">open</a></div><div class="tx">${esc(d.citation.text)}</div><div class="more" onclick="this.parentNode.classList.toggle('open');this.textContent=this.parentNode.classList.contains('open')?'less':'more'">more</div></div>`:'')+
+      (t.status==='escalated'?queueBlock(t):'');
     markKB(d.retrieved,d.citation?d.citation.id:null);
-  }else if(d.status==='escalated'){ const ho=d.handoff||{};
-    h=`<div class="out"><span class="pill ab">Escalated to a human</span><div class="why"><b>${esc(d.reason_title)}.</b> ${esc(d.reason)}</div>
+  }else if(d.status==='escalated'){ const ho=d.handoff||{}, closed=t.status==='closed';
+    h=`<div class="out"><span class="pill ${closed?'mu':'ab'}">${closed?'Closed · answered by a human':'Escalated to a human'}</span><div class="why"><b>${esc(d.reason_title)}.</b> ${esc(d.reason)}</div>
       <div class="lbl">Hand-off note</div><div class="hand"><dl><dt>Searched</dt><dd>${(ho.searched||[]).map(s=>`“${esc(s)}”`).join(' · ')||'—'}</dd>
         <dt>Closest articles</dt><dd>${(ho.closest||[]).map(c=>`<a href="#" onclick="jump(${c.id});return false">${esc(c.title)}</a>`).join(' · ')||'none'}</dd>
         <dt>Next step</dt><dd>${esc(ho.suggested_action||'')}</dd></dl></div>
       <div class="bubble hold"><div class="who">Holding reply</div>${esc(ho.holding_reply||'')}<button class="copy" onclick="copyText(${t.id},'holding',this)">copy</button></div>`+
-      (d.reason_code!=='not_in_documents'?confHTML(d):'');
+      (d.reason_code!=='not_in_documents'?confHTML(d):'')+(t.status==='escalated'?queueBlock(t):'');
     markKB(d.retrieved,null);
   }else{
     h=`<div class="out"><span class="pill er">Model unavailable</span><div class="why err">${esc(d.reason)}</div><div class="why">Not an escalation: the model never answered. Check the API key or quota and retry.</div>
-      <div class="actions"><button class="btn pri sm" onclick="reopen(${t.id},true)">Retry</button></div>`;
+      <div class="actions"><button class="btn pri sm" onclick="reopen(${t.id},true)">Retry</button></div>`+(t.status==='escalated'?queueBlock(t):'');
   }
-  h+=`<div class="meta"><span>${d.latency_ms} ms</span><span>${d.llm_calls} model calls</span></div>
+  h+=`<div class="meta"><span>${d.latency_ms} ms</span><span>${d.llm_calls} model calls</span>${KB.version&&d.kb_version&&d.kb_version!==KB.version?'<span>help centre changed since this run</span>':''}</div>
     <div class="cmp"><button class="btn sm" onclick="compare(${t.id})">Compare with a plain chatbot</button><div class="o" id="cmpOut"></div></div></div>`;
   $('#outcome').innerHTML=h;
 }
 function copyText(id,kind,btn){const r=RESULT[id]||{}; const txt=kind==='reply'?r.reply:((r.handoff||{}).holding_reply||'');
   if(navigator.clipboard&&txt){navigator.clipboard.writeText(txt).then(()=>{btn.textContent='copied';setTimeout(()=>btn.textContent='copy',1500);});}}
-async function post(url,body){const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body||{})});const d=await r.json().catch(()=>({error:'bad response'}));if(!r.ok){d.error=d.error||('HTTP '+r.status);} return d;}
+async function post(url,body,method){const r=await fetch(url,{method:method||'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body||{})});const d=await r.json().catch(()=>({error:'bad response'}));if(!r.ok){d.error=d.error||('HTTP '+r.status);} return d;}
 function toast(msg){let el=$('#toast');if(!el){el=document.createElement('div');el.id='toast';el.className='toast';document.body.appendChild(el);}el.textContent=msg;el.classList.add('show');clearTimeout(el._t);el._t=setTimeout(()=>el.classList.remove('show'),3500);}
-async function send(id){const d=await post(`/inbox/${id}/send`); if(d.error){toast(d.error);return;} Object.assign(TICKETS.find(x=>x.id===id),d.ticket);SESSION=d.session;renderInbox();select(id);}
-async function escalate(id){const d=await post(`/inbox/${id}/escalate`); if(d.error){toast(d.error);return;} if(d.ticket){const t=TICKETS.find(x=>x.id===id);Object.assign(t,d.ticket);SESSION=d.session;renderInbox();renderTicket(t);renderTrace(RESULT[id]?RESULT[id].steps:[],true);
-  $('#outcome').innerHTML=`<div class="out"><span class="pill ab">Escalated by you</span><div class="why">Sent to the human queue with the agent's trace attached.</div></div>`;}}
-async function reopen(id,run){const d=await post(`/inbox/${id}/reopen`); if(d.error){toast(d.error);return;} if(d.ticket){const t=TICKETS.find(x=>x.id===id);Object.assign(t,d.ticket);SESSION=d.session;renderInbox(); if(run!==false) handle(id);}}
+function applyTicket(id,d){ const t=TICKETS.find(x=>x.id===id); if(d.ticket) Object.assign(t,d.ticket); if(d.session) SESSION=d.session; return t; }
+async function send(id){const d=await post(`/inbox/${id}/send`); if(d.error){toast(d.error);return;} applyTicket(id,d); renderInbox(); select(id);}
+async function escalate(id){const d=await post(`/inbox/${id}/escalate`); if(d.error){toast(d.error);return;} const t=applyTicket(id,d); renderInbox(); renderTicket(t);
+  if(RESULT[id]){renderTrace(RESULT[id].steps,true);renderOutcome(t,RESULT[id]);} else $('#outcome').innerHTML=manualCard(t); toast('Sent to the human queue'); }
+async function closeTicket(id){const d=await post(`/inbox/${id}/close`); if(d.error){toast(d.error);return;} const t=applyTicket(id,d); toast('Closed · out of the human queue');
+  if(VIEW==='queue'){SEL=null;renderInbox();renderBoard();} else {renderInbox();select(id);} }
+async function reopen(id,run){const d=await post(`/inbox/${id}/reopen`); if(d.error){toast(d.error);return;} applyTicket(id,d); delete RESULT[id]; renderInbox(); if(run!==false) handle(id);}
 async function compare(id){ const out=$('#cmpOut'); out.classList.add('show'); const t=TICKETS.find(x=>x.id===id);
   out.innerHTML=`<div class="box bad"><h4>Plain chatbot · same model, no help centre</h4>…</div><div class="box"><h4>This agent</h4>see above</div>`;
   const d=await post('/compare',{message:t.message});
   if(d.error&&!d.reply){out.innerHTML=`<div class="box bad"><h4>Plain chatbot</h4><span class="err">${esc(d.error)}</span></div><div class="box"><h4>This agent</h4>see above</div>`;return;}
   out.innerHTML=`<div class="box bad"><h4>Plain chatbot · same model, no help centre</h4>${d.error?`<span class="err">${esc(d.error)}</span>`:esc(d.reply)}</div>
-    <div class="box"><h4>This agent</h4>${d.error?'':(RESULT[id].status==='resolved'?'Replied from a cited article.':'Escalated: the help centre does not cover this. '+esc(META.company)+' is fictional, so anything the chatbot stated was invented.')}</div>`; }
+    <div class="box"><h4>This agent</h4>${d.error?'':((RESULT[id]||{}).status==='resolved'?'Replied from a cited article.':'Escalated: the help centre does not cover this. '+esc(META.company)+' is fictional, so anything the chatbot stated was invented.')}</div>`; }
 
 /* compose + run-all */
 $('#cAdd').onclick=async()=>{ const msg=$('#cMsg').value.trim(); if(!msg||ES) return;
@@ -328,6 +470,7 @@ $('#cAdd').onclick=async()=>{ const msg=$('#cMsg').value.trim(); if(!msg||ES) re
   TICKETS.unshift(d.ticket); SESSION=d.session; $('#cMsg').value='';$('#cSubj').value='';$('#cName').value=''; renderInbox(); select(d.ticket.id); };
 $('#runAll').onclick=()=>{ if(ES) return; QUEUE=TICKETS.filter(t=>t.status==='new').map(t=>t.id).reverse(); runNext(); };
 function runNext(){ const id=QUEUE.shift(); if(id===undefined) return; SEL=id; renderInbox(); const t=TICKETS.find(x=>x.id===id); renderTicket(t); handle(id); }
+document.addEventListener('keydown',e=>{ if(e.key==='Escape'){ $('#modal').classList.remove('show'); if($('#editor').classList.contains('show')) closeEditor(); } });
 init();
 </script>
 </body>
