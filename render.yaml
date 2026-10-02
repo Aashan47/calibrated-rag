@@ -1,0 +1,23 @@
+# Render Blueprint — one-click deploy of the web demo.
+# New -> Blueprint -> pick this repo -> paste your GEMINI_API_KEY. That's it.
+#
+# The demo runs TF-IDF retrieval (no embedding calls -> instant boot, fast queries) over a
+# small committed corpus, and a lenient abstention threshold so it answers readily while
+# still abstaining on unanswerable questions. The LLM still needs the key.
+services:
+  - type: web
+    name: calibrated-rag
+    runtime: python
+    plan: free
+    buildCommand: "echo 'no build step — standard library only'"
+    startCommand: "python serve.py"
+    autoDeploy: true
+    envVars:
+      - key: GEMINI_API_KEY        # set this in the dashboard (secret)
+        sync: false
+      - key: CRAG_RETRIEVER        # lexical: no embedding calls, instant boot
+        value: tfidf
+      - key: CRAG_THRESHOLD        # lenient demo threshold (answers readily; still abstains)
+        value: "0.6"
+      - key: PYTHON_VERSION
+        value: "3.12.6"

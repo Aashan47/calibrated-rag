@@ -13,6 +13,7 @@ import os
 from . import data as squad
 
 INDEX = os.path.join(os.path.dirname(__file__), "..", "data", "index.json")
+DEMO = os.path.join(os.path.dirname(__file__), "demo_corpus.json")   # committed, instant boot
 RESULTS = os.path.join(os.path.dirname(__file__), "..", "results", "results.json")
 
 # Sensible fallback for an uncalibrated corpus (require >= 3/5 self-consistency samples).
@@ -21,10 +22,13 @@ DEFAULT_THRESHOLD = 0.6
 
 def load_contexts() -> tuple[list[str], str, bool]:
     """Return (passages, source_name, is_custom)."""
-    if os.path.exists(INDEX):
+    if os.path.exists(INDEX):     # a corpus you ingested
         obj = json.load(open(INDEX))
         return obj["contexts"], obj.get("name", "custom documents"), True
-    contexts, _ = squad.load()
+    if os.path.exists(DEMO):      # committed demo corpus — instant, no download
+        obj = json.load(open(DEMO))
+        return obj["contexts"], obj.get("name", "SQuAD 2.0 passages (demo corpus)"), False
+    contexts, _ = squad.load()    # fallback: download the SQuAD slice
     return contexts, "SQuAD 2.0 passages (demo corpus)", False
 
 

@@ -145,6 +145,13 @@ Config via env: `CRAG_MODEL` (LLM), `CRAG_EMBED_MODEL` (embeddings), `CRAG_RETRI
 `CRAG_THRESHOLD` (abstention cutoff for custom corpora). The LLM provider is isolated to
 `calibrated_rag/llm.py` (one function), so moving to Claude or GPT is a small change.
 
+### Deploy
+
+A `render.yaml` blueprint is included for a free one-click deploy on
+[Render](https://render.com): **New → Blueprint → pick this repo → paste your `GEMINI_API_KEY`**.
+The hosted demo boots in under a second (TF-IDF over a small committed corpus) and answers readily
+while still abstaining on unanswerable questions.
+
 ---
 
 ## Repo layout
