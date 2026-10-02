@@ -1,6 +1,6 @@
-# calibrated-rag
+# calibrated-rag-agent
 
-![CI](https://github.com/Aashan47/calibrated-rag/actions/workflows/ci.yml/badge.svg)
+![CI](https://github.com/Aashan47/calibrated-rag-agent/actions/workflows/ci.yml/badge.svg)
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue)
 ![dependencies](https://img.shields.io/badge/dependencies-zero-brightgreen)
 ![license](https://img.shields.io/badge/license-MIT-green)
@@ -41,25 +41,35 @@ SQuAD 2.0 dev slice — **300 questions** (140 unanswerable) over 32 passages, m
 
 | | Naive RAG (answers all) | + model self-check | **+ conformal dial** |
 |---|---:|---:|---:|
-| **Hallucination rate on unanswerable Qs** | 100% | 15.7% | **10.1%** |
-| **Accuracy on answered questions** | 42% | 76.5% | **83.1%** |
-| Task accuracy (answer correctly *or* abstain) | 42% | 83.3% | 77.2% |
-| Coverage (fraction answered) | 100% | 54% | 39% |
+| **Hallucination rate on unanswerable Qs** | 100% | 16.9% | **9.0%** |
+| **Accuracy on answered questions** | 41% | 74.5% | **81.9%** |
+| Task accuracy (answer correctly *or* abstain) | 41% | 81.7% | 77.8% |
+| Coverage (fraction answered) | 100% | 54% | 40% |
 
-Two things to read here:
+95% bootstrap CIs on the calibrated column (test split, n=180): selective accuracy
+**81.9% [72.9, 90.6]**, hallucination **9.0% [3.4, 15.7]**, coverage **40.0% [32.8, 47.2]** —
+see [EVALUATION.md](EVALUATION.md). Two things to read here:
 
 1. **Abstention is the whole game.** A vanilla RAG that always answers hallucinates on *every*
-   unanswerable question (100%) and lands at 42% task accuracy. Letting the agent say "I can't
-   answer this" takes task accuracy to 83%.
+   unanswerable question (100%) and lands at 41% task accuracy. Letting the agent say "I can't
+   answer this" takes task accuracy to 82%.
 2. **The conformal layer adds a tunable *guarantee* on top.** Set a target error α; it calibrates
    the confidence threshold on held-out data so accuracy on answered questions clears it — verified
-   on a disjoint test split (**16.9% error ≤ 20% target**). It lifts answered-accuracy from 77% to
-   **83%** and cuts the hallucination rate on unanswerable questions by a third (16% → **10%**), at a
-   coverage cost. A naive RAG gives you no such dial.
+   on a disjoint test split (**18.1% error ≤ 20% target**). It lifts answered-accuracy from 75% to
+   **82%** and cuts the hallucination rate on unanswerable questions by nearly half (17% → **9%**), at
+   a coverage cost. A naive RAG gives you no such dial.
 
 **Calibration ablation — the confidence signal matters.** With the same model, the *raw
-self-reported* confidence gives ECE **0.231**; **self-consistency** (agreement across samples) gives
-ECE **0.158**. A better-calibrated signal is what makes the abstention threshold trustworthy.
+self-reported* confidence gives ECE **0.247**; **self-consistency** (agreement across samples) gives
+ECE **0.190**. A better-calibrated signal is what makes the abstention threshold trustworthy.
+
+**Agent ablation — the loop earns its place.** Versus a single-shot baseline (retrieve once, answer)
+on the same slice: the agent lifts gold-passage recall (98.8% → 99.4%) and cuts hallucination
+(20.2% → 16.9%, trust-model policy) at **no extra average cost** (4.6 vs 5.0 LLM calls/query —
+early abstention skips answer sampling). And under the same α=0.20 target the single-shot system's
+confidence couldn't meet the error bound at *any* coverage (conformal fell back to abstain-all),
+while the agent met it at 40% coverage. Full numbers, behaviour, and groundedness (citations point to
+the gold passage **100%** of the time on correct answers) in **[EVALUATION.md](EVALUATION.md)**.
 
 <p>
 <img src="results/reliability.svg" width="440" alt="Reliability diagram">
@@ -156,7 +166,11 @@ python evaluate.py --alpha 0.20
 # Measure retrieval quality (lexical vs hybrid recall@k)
 python retrieval_eval.py
 
-# Run the tests (offline, no API key needed)
+# Production eval suite
+python -m eval.ablation --alpha 0.20   # agent loop vs single-shot baseline
+python -m eval.behavior                # behaviour, groundedness, calibration w/ bootstrap CIs
+
+# Run the tests (offline, no API key needed) — unit + end-to-end eval gate
 python -m unittest discover -s tests -v
 ```
 
@@ -190,12 +204,18 @@ calibrated_rag/
   trace.py        # append-only JSONL query trace (observability)
 evaluate.py       # full QA evaluation → results/results.json + charts
 retrieval_eval.py # retrieval ablation (lexical vs hybrid recall@k)
+eval/
+  stats.py        # bootstrap confidence intervals (uncertainty on every metric)
+  behavior.py     # agent behaviour, reformulation recovery, citation groundedness, calibration CIs
+  ablation.py     # agent decision loop vs single-shot baseline — does the loop earn its calls?
 serve.py          # zero-dep web demo (HTTP API + single-page UI)
 ask.py            # interactive CLI
 ingest.py         # index your own .txt/.md docs
-tests/            # offline unit tests (unittest)
+tests/            # offline tests: unit (test_core) + end-to-end eval gate (test_eval_gate)
 .github/workflows/ci.yml   # runs the tests on every push/PR
 ```
+
+Full methodology, metrics, and results in **[EVALUATION.md](EVALUATION.md)**.
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for the design decisions and extension points.
 

@@ -74,6 +74,7 @@ which `serve.py` and `ask.py` surface so you can see *why* it answered or abstai
 | `calibrated_rag/corpus.py` | load SQuAD slice *or* an ingested custom corpus |
 | `calibrated_rag/trace.py` | append-only JSONL query trace (observability) |
 | `evaluate.py` / `ask.py` / `serve.py` / `ingest.py` | eval driver / CLI / web demo / doc indexer |
+| `eval/` | production eval suite: `ablation.py` (loop vs single-shot), `behavior.py` (behaviour/groundedness/calibration CIs), `stats.py` (bootstrap) — see [EVALUATION.md](EVALUATION.md) |
 
 ## Extension points (where production work would go next)
 

@@ -1,0 +1,41 @@
+{
+  "alpha_target_error": 0.2,
+  "single_shot": {
+    "gold_recall": 0.9875,
+    "llm_calls_per_query": 5.0,
+    "calibrated_threshold": 1.01,
+    "trust_model": {
+      "coverage": 0.5722,
+      "selective_accuracy": 0.7184,
+      "hallucination_rate_unanswerable": 0.2022,
+      "task_accuracy": 0.8056,
+      "answered": 103
+    },
+    "calibrated": {
+      "coverage": 0.0,
+      "selective_accuracy": 0.0,
+      "hallucination_rate_unanswerable": 0.0,
+      "task_accuracy": 0.4944,
+      "answered": 0
+    }
+  },
+  "agent_loop": {
+    "gold_recall": 0.9938,
+    "llm_calls_per_query": 4.59,
+    "calibrated_threshold": 1.0,
+    "trust_model": {
+      "coverage": 0.5444,
+      "selective_accuracy": 0.7449,
+      "hallucination_rate_unanswerable": 0.1685,
+      "task_accuracy": 0.8167,
+      "answered": 98
+    },
+    "calibrated": {
+      "coverage": 0.4,
+      "selective_accuracy": 0.8194,
+      "hallucination_rate_unanswerable": 0.0899,
+      "task_accuracy": 0.7778,
+      "answered": 72
+    }
+  }
+}

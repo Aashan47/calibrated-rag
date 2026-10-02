@@ -72,7 +72,9 @@ class Agent:
             self.retrieval_mode = hr.mode
         self.k = k
         self.n = n_samples
-        self.max_steps = max(1, int(os.environ.get("CRAG_MAX_STEPS", max_steps)))
+        # max_steps = 0 disables the decision loop (single retrieve→answer) — used as the
+        # ablation baseline in eval/ablation.py to measure what the agent loop actually buys.
+        self.max_steps = max(0, int(os.environ.get("CRAG_MAX_STEPS", max_steps)))
         self.search = SearchTool(self.retriever, contexts, k=k)
 
     # -- the agent loop -----------------------------------------------------------------
@@ -88,14 +90,16 @@ class Agent:
         def run_search(q: str) -> int:
             queries.append(q)
             hits = self.search(q)
+            ids = [h["corpus_id"] for h in hits]
             added = 0
-            for h in hits:
-                cid = h["corpus_id"]
+            for cid in ids:
                 if cid not in seen:
                     seen.add(cid)
                     gathered.append(cid)
                     added += 1
-            steps.append({"action": "search", "query": q, "found": len(hits), "new": added})
+            # record the ids so offline trajectory analysis (eval/behavior.py) can measure
+            # retrieval recall before/after reformulation without re-querying.
+            steps.append({"action": "search", "query": q, "ids": ids, "new": added})
             return added
 
         # Seed: always start by searching the question as asked.

@@ -6,7 +6,7 @@
 # still abstaining on unanswerable questions. The LLM still needs the key.
 services:
   - type: web
-    name: calibrated-rag
+    name: calibrated-rag-agent
     runtime: python
     plan: free
     buildCommand: "echo 'no build step — standard library only'"
