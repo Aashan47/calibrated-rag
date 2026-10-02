@@ -84,16 +84,24 @@ class Agent:
         self.search = SearchTool(self.retriever, contexts, k=k)
 
     # -- the agent loop -----------------------------------------------------------------
-    def predict(self, question: str) -> dict:
+    def predict(self, question: str, on_event=None) -> dict:
         """Run the decision loop and return a raw prediction (the conformal threshold is
         applied later by `decide`). The returned dict also carries `steps` — the actions the
         agent took — so callers can show the agent's reasoning trace, `llm_calls`, and an
-        `error` field when the model itself was unavailable."""
+        `error` field when the model itself was unavailable.
+
+        `on_event(step)` is called as each step happens (search, decide, abstain, sampling,
+        sample), which is how the console streams the agent's work live."""
         gathered: list[int] = []        # corpus ids, in discovery order
         seen: set[int] = set()
         queries: list[str] = []
         steps: list[dict] = []
         calls = [0]                     # LLM calls made (boxed so closures can bump it)
+        emit = on_event or (lambda step: None)
+
+        def record(step: dict) -> None:
+            steps.append(step)
+            emit(step)
 
         def run_search(q: str) -> int:
             queries.append(q)
@@ -107,7 +115,7 @@ class Agent:
                     added += 1
             # record the ids so offline trajectory analysis (eval/behavior.py) can measure
             # retrieval recall before/after reformulation without re-querying.
-            steps.append({"action": "search", "query": q, "ids": ids, "new": added})
+            record({"action": "search", "query": q, "ids": ids, "new": added})
             return added
 
         # Seed: always start by searching the question as asked.
@@ -118,12 +126,12 @@ class Agent:
             calls[0] += 1
             action = d.get("action", "answer")
             if action == "abstain":
-                steps.append({"action": "abstain", "reason": d.get("reason", "")})
+                record({"action": "abstain", "reason": d.get("reason", "")})
                 return self._abstained(gathered, steps, calls[0])
             if action == "search":
                 q = (d.get("query") or "").strip()
-                steps.append({"action": "decide", "next": "search", "query": q,
-                              "reason": d.get("reason", "")})
+                record({"action": "decide", "next": "search", "query": q,
+                        "reason": d.get("reason", "")})
                 if not q or _norm(q) in {_norm(x) for x in queries}:
                     break           # no genuinely new query to try → stop and answer
                 run_search(q)
@@ -132,10 +140,10 @@ class Agent:
             step = {"action": "decide", "next": "answer", "reason": d.get("reason", "")}
             if d.get("error"):
                 step["error"] = d["error"]   # the decision was never made — the API failed
-            steps.append(step)
+            record(step)
             break
 
-        return self._finish(question, gathered, steps, calls)
+        return self._finish(question, gathered, steps, calls, record)
 
     def _decide(self, question: str, gathered: list[int], queries: list[str]) -> dict:
         """Ask the LLM what to do next.
@@ -164,18 +172,23 @@ class Agent:
             return {"action": "answer", "reason": "decision response was not parseable"}
 
     def _finish(self, question: str, gathered: list[int], steps: list[dict],
-                calls: list[int]) -> dict:
+                calls: list[int], record=None) -> dict:
         """The agent chose to answer: produce a self-consistency answer over everything it
         gathered, and map the citation back to the corpus."""
+        record = record or steps.append
         if not gathered:
             return self._abstained(gathered, steps, calls[0])
         numbered = "\n\n".join(f"[{j+1}] {self.contexts[i]}" for j, i in enumerate(gathered))
+        record({"action": "sampling", "n": self.n})
         with ThreadPoolExecutor(max_workers=self.n) as ex:
             samples = list(ex.map(
                 lambda t: llm.answer_or_abstain(question, numbered, temperature=t),
                 [0.0] + [0.7] * (self.n - 1)))
         calls[0] += self.n
         agg = _aggregate(samples, self.n)
+        record({"action": "sample", "n": self.n, "votes": agg["votes"],
+                "agreement": agg["confidence"], "errors": agg["errors"],
+                "error": agg.get("error")})
         cite_local = agg.pop("cite_local")
         citation = None
         if 1 <= cite_local <= len(gathered):

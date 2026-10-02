@@ -9,6 +9,9 @@
 escalates to a human when it can't — with the escalation threshold calibrated so wrong replies stay
 under a target rate.**
 
+**Live demo:** [helpdesk-agent-6wri.onrender.com](https://helpdesk-agent-6wri.onrender.com/) — a ticket inbox over a
+fictional SaaS help centre; pick a ticket and watch the agent work. (Free tier: first load can take ~30 s to wake.)
+
 Most support bots are a chat model with the help centre pasted in. They answer every ticket, and on
 the tickets the help centre doesn't cover they answer *confidently and wrongly* — a made-up refund
 window, an SLA that doesn't exist. For a business, one of those costs more than ten tickets routed
@@ -22,7 +25,7 @@ selective prediction), so *the rate of wrong replies is a number you set, not a 
 - 📉 **Calibrated escalation** — threshold set on 68 labelled Northwind tickets for a 10% error target; measured **3.6%** on the held-out split
 - 🧠 **Self-consistency confidence** — agreement across N independent reply samples (clustered by meaning), not the model's self-reported number
 - 🚦 **Outages are never escalations** — a rate-limited or failed call is reported as "model unavailable", with the HTTP status, never as "not covered"
-- 🖥️ **Support console** — browse the help centre, handle tickets, see confidence vs threshold, the cited article, the agent's full trace, and what a generic chatbot would have said instead
+- 🖥️ **Support console** — a ticket inbox: the agent handles tickets while you watch each step stream live (search → judge → draft → decide); send the reply or escalate; browse the help centre; compare with a plain chatbot
 - 📁 **Your own help centre** — `ingest.py` indexes a folder of articles; label ~50 of your tickets and calibrate the threshold for *your* domain
 - 📊 **Measured** — calibration, groundedness, agent behaviour, an ablation against single-shot, and bootstrap CIs; also run on SQuAD 2.0 as a public benchmark
 - 🪶 **Zero dependencies** — standard library only: retrieval, server, UI, charts, API client
@@ -111,7 +114,7 @@ No install (Python 3.10+, standard library only). Set a Gemini key:
 ```bash
 export GEMINI_API_KEY=...
 
-python serve.py                 # support console at http://localhost:8000
+python serve.py                 # support console (inbox + live agent trace) at http://localhost:8000
 python ask.py "Can we pay by bank transfer?"            # -> cited reply draft
 python ask.py "Do you have an on-prem version?"         # -> escalated, with closest articles
 
@@ -126,8 +129,9 @@ python -m eval.ablation; python -m eval.behavior        # loop vs single-shot; b
 python -m unittest discover -s tests -v                 # offline: unit, eval gate, KB consistency
 ```
 
-JSON API: `GET /meta`, `GET /articles`, `POST /ticket {"message"}`, `POST /compare {"message"}`,
-`GET /health`.
+JSON API: `GET /meta`, `GET /articles`, `GET /inbox`, `POST /inbox {"message"}`, `GET /inbox/<id>/stream`
+(server-sent events, one per agent step), `POST /inbox/<id>/send|escalate|reopen`, `POST /ticket {"message"}`
+(one-shot), `POST /compare {"message"}`, `GET /health`.
 
 Config via env: `HDA_MODEL`, `HDA_EMBED_MODEL`, `HDA_RETRIEVER=tfidf|hybrid`, `HDA_THRESHOLD`
 (override τ), `HDA_SAMPLES` (reply samples per ticket, default 5), `HDA_MAX_STEPS` (loop bound,

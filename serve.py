@@ -8,11 +8,19 @@ ticket either a cited reply draft or an escalation with a hand-off note for the 
 plus the confidence against the calibrated threshold and the agent's full trace.
 
 Endpoints
-    GET  /           the console
-    GET  /meta       company, model, threshold (and where it came from), calibration stats
-    GET  /articles   every help-centre article the agent can reply from
-    POST /ticket     {"message"} -> resolved / escalated / error, with citation, trace, hand-off
-    POST /compare    {"message"} -> what a generic chatbot (same model, no help centre) replies
+    GET  /                    the console
+    GET  /meta                company, model, threshold (and where it came from), calibration stats
+    GET  /articles            every help-centre article the agent can reply from
+    GET  /inbox               the ticket queue with statuses and outcomes
+    POST /inbox               {"message","customer","subject"} -> new ticket
+    GET  /inbox/<id>/stream   handle a ticket; server-sent events stream each agent step live,
+                              ending with the full result (the console's live trace)
+    POST /inbox/<id>/send     mark an auto-resolved reply as sent
+    POST /inbox/<id>/escalate send a ticket to the human queue regardless of the agent
+    POST /inbox/<id>/reopen   back to new
+    GET  /session             counts by status for this session
+    POST /ticket              {"message"} -> one-shot result (non-streaming API)
+    POST /compare             {"message"} -> what a generic chatbot (same model, no help centre) replies
     GET  /health
 """
 
@@ -25,6 +33,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from helpdesk_agent import agent as agent_mod
 from helpdesk_agent import corpus, llm, trace
+from helpdesk_agent.inbox import Inbox
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 UI = os.path.join(HERE, "helpdesk_agent", "ui", "index.html")
@@ -41,6 +50,7 @@ print(f"Ready: {len(_CONTEXTS)} articles from {_C['name']}; escalation threshold
 
 _ART = [{"id": i, **a, "words": len(_CONTEXTS[i].split()), "text": _CONTEXTS[i]}
         for i, a in enumerate(_ARTICLES)]
+_INBOX = Inbox(seed_path=None if _CUSTOM else Inbox.__init__.__defaults__[0])
 
 # Example tickets for the committed Northwind help centre (verifiably in / not in it).
 _EXAMPLES = None if _CUSTOM else {
@@ -160,15 +170,12 @@ def _handoff(question: str, pred: dict, code: str, reason: str) -> dict:
                               "answer it properly, and you'll hear back from us shortly.")}
 
 
-def _handle(question: str) -> dict:
+def _handle(question: str, on_event=None) -> dict:
     t0 = time.time()
-    pred = _AGENT.predict(question)
+    pred = _AGENT.predict(question, on_event=on_event)
     d = agent_mod.decide(pred, _TAU)
     status, code, reason = _explain(pred, d)
     steps = list(pred.get("steps", []))
-    if pred.get("retrieved") and not any(s.get("action") == "abstain" for s in steps):
-        steps.append({"action": "sample", "n": _AGENT.n, "votes": pred.get("votes", 0),
-                      "errors": pred.get("errors", 0), "error": pred.get("error")})
     latency = round((time.time() - t0) * 1000)
     trace.log({"q": question[:200], "status": status, "code": code,
                "confidence": round(d["confidence"], 2), "llm_calls": pred.get("llm_calls", 0),
@@ -220,8 +227,44 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(data)
 
+    def _stream(self, tid: int) -> None:
+        """Server-sent events: one event per agent step as it happens, then the result."""
+        self.send_response(200)
+        self.send_header("Content-Type", "text/event-stream; charset=utf-8")
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("X-Accel-Buffering", "no")
+        self.end_headers()
+
+        def send(kind: str, payload: dict) -> None:
+            try:
+                self.wfile.write(f"event: {kind}\ndata: {json.dumps(payload)}\n\n".encode())
+                self.wfile.flush()
+            except (BrokenPipeError, ConnectionResetError):
+                pass
+
+        try:
+            t = _INBOX.get(tid)
+        except KeyError:
+            send("done", {"error": "no such ticket"})
+            return
+        _INBOX.set_status(tid, "handling")
+        send("ticket", _INBOX.get(tid))
+        try:
+            result = _handle(t["message"], on_event=lambda step: send("step", step))
+        except Exception as exc:  # noqa: BLE001
+            _INBOX.set_status(tid, "error")
+            send("done", {"error": str(exc)})
+            return
+        status = {"resolved": "auto-resolved", "escalated": "escalated"}.get(result["status"], "error")
+        _INBOX.set_status(tid, status, result=result)
+        send("done", {"result": result, "ticket": _INBOX.get(tid), "session": _INBOX.counts()})
+
     def do_GET(self):  # noqa: N802
         path = self.path.split("?", 1)[0]
+        parts = path.strip("/").split("/")
+        if len(parts) == 3 and parts[0] == "inbox" and parts[2] == "stream" and parts[1].isdigit():
+            self._stream(int(parts[1]))
+            return
         if path == "/" or path.startswith("/index"):
             with open(UI, encoding="utf-8") as f:
                 self._send(200, f.read(), "text/html; charset=utf-8")
@@ -229,6 +272,10 @@ class Handler(BaseHTTPRequestHandler):
             self._send(200, json.dumps(_meta()))
         elif path == "/articles":
             self._send(200, json.dumps({"n": len(_ART), "name": _C["name"], "articles": _ART}))
+        elif path == "/inbox":
+            self._send(200, json.dumps({"tickets": _INBOX.list(), "session": _INBOX.counts()}))
+        elif path == "/session":
+            self._send(200, json.dumps(_INBOX.counts()))
         elif path == "/health":
             self._send(200, json.dumps({"ok": True, "articles": len(_CONTEXTS)}))
         else:
@@ -240,10 +287,30 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):  # noqa: N802
         try:
+            parts = self.path.strip("/").split("/")
+            if parts[0] == "inbox" and len(parts) == 3 and parts[1].isdigit():
+                tid, act = int(parts[1]), parts[2]
+                t = _INBOX.get(tid)
+                if act == "send" and t["status"] == "auto-resolved":
+                    self._send(200, json.dumps({"ticket": _INBOX.set_status(tid, "sent"),
+                                                "session": _INBOX.counts()}))
+                elif act == "escalate":
+                    self._send(200, json.dumps({"ticket": _INBOX.set_status(tid, "escalated"),
+                                                "session": _INBOX.counts()}))
+                elif act == "reopen":
+                    self._send(200, json.dumps({"ticket": _INBOX.set_status(tid, "new"),
+                                                "session": _INBOX.counts()}))
+                else:
+                    self._send(400, json.dumps({"error": f"cannot {act} a ticket that is {t['status']}"}))
+                return
             b = self._body()
             q = str(b.get("message") or b.get("question") or "").strip()[:600]
             if not q:
                 self._send(400, json.dumps({"error": "message is required"}))
+            elif self.path == "/inbox":
+                t = _INBOX.add(q, customer=str(b.get("customer", ""))[:60],
+                               subject=str(b.get("subject", ""))[:120])
+                self._send(200, json.dumps({"ticket": t, "session": _INBOX.counts()}))
             elif self.path in ("/ticket", "/ask"):
                 self._send(200, json.dumps(_handle(q)))
             elif self.path == "/compare":

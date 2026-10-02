@@ -3,302 +3,316 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>helpdesk-agent · support console</title>
+<title>helpdesk-agent</title>
 <style>
 :root{
-  --bg:#0b0f14;--panel:#111821;--panel2:#0d141b;--line:#1d2834;--line2:#2a3848;
-  --ink:#e8eef4;--mut:#8f9fb0;--dim:#5e6e7e;--accent:#58a6ff;--ok:#3fd99b;--warn:#f2b84b;--bad:#ff7070;
+  --bg:#f6f7f9;--panel:#ffffff;--soft:#f1f3f6;--line:#e4e7ec;--line2:#d2d7df;
+  --ink:#111827;--mut:#6b7280;--dim:#9aa3af;--accent:#2563eb;--accent2:#e8efff;
+  --ok:#059669;--ok2:#e6f7f0;--warn:#b45309;--warn2:#fff4e0;--bad:#dc2626;--bad2:#fdeaea;
   --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
 }
 *{box-sizing:border-box}
-html,body{margin:0;background:var(--bg);color:var(--ink);font:14.5px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Inter,sans-serif}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif}
 a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}
 button{font:inherit;cursor:pointer}
-.mono{font-family:var(--mono);font-size:12.5px}
+.mono{font-family:var(--mono);font-size:12px}
 
-.top{display:flex;align-items:center;gap:14px;padding:11px 22px;border-bottom:1px solid var(--line);background:var(--panel);position:sticky;top:0;z-index:5}
-.brand{font-weight:700;font-size:15px}
-.brand .co{color:var(--mut);font-weight:500;margin-left:10px}
-.brand .co:before{content:"·";margin-right:10px;color:var(--dim)}
+/* top */
+.top{display:flex;align-items:center;gap:12px;height:52px;padding:0 20px;background:var(--panel);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5}
+.brand{font-weight:700;font-size:15px}.brand span{color:var(--mut);font-weight:400;margin-left:8px}
 .top .sp{flex:1}
-.sys{display:flex;gap:7px;flex-wrap:wrap}
-.tag{font-size:11.5px;color:var(--mut);border:1px solid var(--line2);border-radius:6px;padding:3px 8px;background:var(--panel2)}
-.tag b{color:var(--ink);font-weight:600}.tag.live b{color:var(--ok)}.tag.down b{color:var(--bad)}
+.chip{font-size:12px;color:var(--mut);border:1px solid var(--line);border-radius:6px;padding:3px 9px;background:var(--panel)}
+.chip b{color:var(--ink);font-weight:600}
+.dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--ok);margin-right:5px;vertical-align:1px}.dot.off{background:var(--bad)}
+.lnk{font-size:12px;color:var(--mut)}
 
-.hero{padding:20px 22px 14px;border-bottom:1px solid var(--line)}
-.hero h1{margin:0 0 6px;font-size:20px;max-width:1000px}
-.hero p{margin:0;color:var(--mut);max-width:1000px}
-.hero p b{color:var(--ink)}
-.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;margin-top:14px;max-width:1000px}
-.stat{border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--panel)}
-.stat .v{font-size:22px;font-weight:700}
-.stat .v small{font-size:12px;color:var(--mut);font-weight:500;margin-left:6px}
-.stat .l{font-size:11.5px;color:var(--mut);text-transform:uppercase;letter-spacing:.06em}
-.stat.ok .v{color:var(--ok)}.stat.warn .v{color:var(--warn)}
-details.how{margin-top:12px;max-width:1000px}
-details.how summary{cursor:pointer;color:var(--accent);font-weight:600;font-size:13.5px;list-style:none}
-details.how summary::before{content:"▸ ";color:var(--dim)}details.how[open] summary::before{content:"▾ "}
-table.cmp{border-collapse:collapse;margin-top:10px;width:100%;font-size:13.5px}
-table.cmp th,table.cmp td{text-align:left;padding:7px 10px;border-top:1px solid var(--line);vertical-align:top}
-table.cmp th{color:var(--mut);font-weight:600}table.cmp td:first-child{color:var(--mut);white-space:nowrap}
+/* stats strip */
+.strip{display:flex;align-items:center;gap:10px;padding:12px 20px;border-bottom:1px solid var(--line);background:var(--panel);flex-wrap:wrap}
+.strip .lead{font-size:14px;color:var(--ink);margin-right:8px}
+.stat{display:flex;align-items:baseline;gap:7px;padding:6px 12px;border:1px solid var(--line);border-radius:8px;background:var(--panel)}
+.stat b{font-size:17px;font-weight:700}.stat span{font-size:12px;color:var(--mut)}
+.stat.ok b{color:var(--ok)}.stat.warn b{color:var(--warn)}
+.strip .sp{flex:1}
+.how{font-size:13px;color:var(--accent);background:none;border:0;padding:0}
 
-.main{display:grid;grid-template-columns:350px 1fr}
-@media(max-width:900px){.main{grid-template-columns:1fr}.side{position:static;height:auto;max-height:380px;border-right:0;border-bottom:1px solid var(--line)}}
-.side{border-right:1px solid var(--line);background:var(--panel);display:flex;flex-direction:column;position:sticky;top:56px;height:calc(100vh - 56px);overflow:hidden}
-.side .hd{padding:14px 16px 10px;border-bottom:1px solid var(--line)}
-.side h2{margin:0 0 2px;font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--mut)}
-.side .nm{font-weight:600}.side .ct{color:var(--mut);font-size:12.5px}
-.side input{width:100%;margin-top:10px;padding:8px 10px;border-radius:7px;border:1px solid var(--line2);background:var(--panel2);color:var(--ink);font-size:13px}
-.side input:focus{outline:none;border-color:var(--accent)}
-.alist{overflow:auto;flex:1;padding:6px 8px 20px}
-.cat{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--dim);padding:10px 10px 4px}
-.art{padding:7px 10px;border-radius:8px;border:1px solid transparent;cursor:pointer;margin-bottom:2px}
-.art:hover{background:var(--panel2);border-color:var(--line)}
-.art .t{font-size:13px;font-weight:600;display:flex;gap:8px;align-items:baseline}
-.art .t .id{color:var(--dim);font-family:var(--mono);font-size:11px;min-width:28px}
-.art .body{display:none;margin:7px 0 2px 36px;color:#c3cfdb;font-size:13px;line-height:1.5}
-.art.open .body{display:block}
-.art.hit{border-color:var(--line2);background:var(--panel2)}.art.hit .id{color:var(--accent)}
-.art.cited{border-color:rgba(63,217,155,.5);background:rgba(63,217,155,.06)}.art.cited .id{color:var(--ok)}
-.legend{padding:8px 16px;border-top:1px solid var(--line);font-size:11.5px;color:var(--dim);display:flex;gap:14px}
-.legend i{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:5px;vertical-align:middle}
+/* layout */
+.main{display:grid;grid-template-columns:290px 1fr 300px;height:calc(100vh - 52px - 57px)}
+@media(max-width:1100px){.main{grid-template-columns:270px 1fr}.kb{display:none}}
+@media(max-width:760px){.main{grid-template-columns:1fr;height:auto}.inbox{max-height:48vh}}
+.pane{display:flex;flex-direction:column;min-height:0;border-right:1px solid var(--line);background:var(--panel)}
+.pane:last-child{border-right:0}
+.hd{padding:12px 16px 10px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;gap:8px}
+.hd h2{margin:0;font-size:13px;font-weight:700}.hd small{color:var(--mut);font-weight:400;margin-left:6px}
+.scroll{overflow:auto;flex:1;min-height:0}
+.sbtn{font-size:12px;padding:5px 10px;border-radius:6px;border:1px solid var(--line2);background:var(--panel);color:var(--ink);font-weight:600;white-space:nowrap}
+.sbtn:hover{border-color:var(--accent);color:var(--accent)}.sbtn:disabled{opacity:.45;cursor:default}
 
-.content{padding:18px 22px 60px;max-width:980px}
-.lbl{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--mut);margin-top:16px}
-.lbl.first{margin-top:0}
-.ticket{display:flex;gap:10px;margin-top:6px;align-items:stretch}
-.ticket textarea{flex:1;min-height:64px;padding:11px 13px;border-radius:9px;border:1px solid var(--line2);background:var(--panel);color:var(--ink);font:inherit;font-size:15px;resize:vertical}
-.ticket textarea:focus{outline:none;border-color:var(--accent)}
-.ticket button{padding:0 20px;border:0;border-radius:9px;background:var(--accent);color:#06121f;font-weight:700;white-space:nowrap}
-.ticket button:disabled{opacity:.5;cursor:default}
-.ex{margin-top:10px;display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
-@media(max-width:860px){.ex{grid-template-columns:1fr}}
-.ex h3{margin:0 0 6px;font-size:11.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--mut)}
-.chip{display:block;text-align:left;width:100%;font-size:12.5px;color:var(--mut);border:1px solid var(--line2);border-radius:8px;padding:6px 10px;margin:0 0 6px;background:transparent}
-.chip:hover{color:var(--ink);border-color:var(--accent)}
+/* inbox */
+.tk{padding:10px 16px;border-bottom:1px solid var(--line);cursor:pointer;border-left:3px solid transparent}
+.tk:hover{background:var(--soft)}.tk.sel{background:var(--accent2);border-left-color:var(--accent)}
+.tk .r1{display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+.tk .who{font-weight:600;font-size:13px}.tk .ago{color:var(--dim);font-size:11px}
+.tk .sub{font-size:12.5px;color:var(--mut);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.st{display:inline-block;font-size:10.5px;font-weight:600;padding:2px 7px;border-radius:10px;margin-top:5px}
+.st.new{background:var(--soft);color:var(--mut)}.st.handling{background:var(--accent2);color:var(--accent)}
+.st.auto-resolved,.st.sent{background:var(--ok2);color:var(--ok)}.st.escalated{background:var(--warn2);color:var(--warn)}.st.error{background:var(--bad2);color:var(--bad)}
+.compose{padding:10px 16px 12px;border-top:1px solid var(--line);background:var(--soft)}
+.compose textarea{width:100%;min-height:54px;padding:8px 10px;border-radius:6px;border:1px solid var(--line2);background:var(--panel);font:inherit;font-size:13px;resize:vertical}
+.compose textarea:focus,.kb input:focus{outline:none;border-color:var(--accent)}
+.compose .row{display:flex;gap:6px;margin-top:6px}
+.compose input{flex:1;padding:6px 9px;border-radius:6px;border:1px solid var(--line2);background:var(--panel);font:inherit;font-size:12.5px}
+.compose button{padding:6px 12px;border:0;border-radius:6px;background:var(--accent);color:#fff;font-weight:600;font-size:12.5px}
 
-.card{margin-top:18px;border:1px solid var(--line);border-radius:12px;background:var(--panel);padding:18px 20px;display:none}
-.card.show{display:block}
-.pill{display:inline-block;font-size:11.5px;font-weight:700;letter-spacing:.05em;padding:3px 10px;border-radius:20px}
-.pill.ok{background:rgba(63,217,155,.14);color:var(--ok)}.pill.ab{background:rgba(242,184,75,.14);color:var(--warn)}
-.pill.er{background:rgba(255,112,112,.14);color:var(--bad)}.pill.wk{background:var(--line);color:var(--mut)}
-.q{color:var(--mut);font-size:13px;margin-top:10px}
-.q:before{content:"Customer: ";color:var(--dim)}
-.bubble{margin-top:10px;padding:13px 16px;border-radius:12px;background:#122a3d;border:1px solid #1f3f5a;font-size:15px;line-height:1.55;position:relative}
-.bubble .who{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--accent);margin-bottom:4px}
-.bubble .copy{position:absolute;right:10px;top:10px;background:transparent;border:1px solid var(--line2);color:var(--mut);border-radius:6px;padding:3px 8px;font-size:11.5px}
-.fact{color:var(--mut);font-size:13px;margin-top:8px}.fact b{color:var(--ink)}
-.why{color:var(--mut);font-size:13.5px;margin-top:6px}.why b{color:var(--ink)}
-.bar{position:relative;height:10px;border-radius:6px;background:var(--line);margin-top:8px}
-.bar .fill{height:100%;border-radius:6px;background:var(--accent)}
-.bar .tau{position:absolute;top:-4px;width:2px;height:18px;background:var(--warn)}
-.bar .tau:after{content:"threshold";position:absolute;top:18px;left:-26px;font-size:10.5px;color:var(--warn);white-space:nowrap}
-.confrow{display:flex;justify-content:space-between;font-size:12.5px;color:var(--mut);margin-top:20px}
-.cite{margin-top:8px;padding:12px 14px;border-left:3px solid var(--ok);background:var(--panel2);border-radius:6px;font-size:13.5px;color:#c9d6e2;line-height:1.55}
-.cite .ct{font-size:12px;color:var(--mut);margin-bottom:4px}.cite .ct b{color:var(--ok);font-family:var(--mono)}
-.hand{margin-top:8px;border:1px solid rgba(242,184,75,.35);background:rgba(242,184,75,.05);border-radius:10px;padding:12px 14px;font-size:13.5px}
-.hand h4{margin:0 0 8px;font-size:11.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--warn)}
-.hand dl{margin:0;display:grid;grid-template-columns:130px 1fr;gap:4px 10px}
-.hand dt{color:var(--mut)}.hand dd{margin:0}
-.hand .act{margin-top:8px;padding-top:8px;border-top:1px dashed var(--line2)}
-.trace{margin-top:8px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:10px 14px}
-.trace ol{margin:0;padding:0;list-style:none}
-.trace li{display:grid;grid-template-columns:24px 1fr;gap:8px;padding:5px 0;border-top:1px dashed var(--line);font-size:13px}
+/* ticket */
+.ticket{padding:18px 24px 40px;max-width:860px}
+.empty{color:var(--dim);padding:60px 20px;text-align:center}
+.thead{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+.subj{font-size:17px;font-weight:700}.from{color:var(--mut);font-size:12.5px;margin-top:2px}
+.msg{margin-top:12px;padding:12px 14px;border-radius:10px;background:var(--soft);border:1px solid var(--line);font-size:14px;line-height:1.55;white-space:pre-wrap}
+.lbl{font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--dim);margin-top:16px}
+.btn{padding:7px 14px;border-radius:7px;border:1px solid var(--line2);background:var(--panel);color:var(--ink);font-weight:600;font-size:13px}
+.btn:hover{border-color:var(--accent)}.btn.pri{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.ok{background:var(--ok);border-color:var(--ok);color:#fff}.btn.warn{border-color:var(--warn);color:var(--warn)}
+.btn.sm{padding:5px 10px;font-size:12px}.btn:disabled{opacity:.45;cursor:default}
+.actions{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+
+/* trace */
+.trace{margin-top:6px;border:1px solid var(--line);border-radius:8px;background:var(--panel);min-height:36px}
+.trace ol{margin:0;padding:4px 12px;list-style:none}
+.trace li{display:grid;grid-template-columns:20px 1fr;gap:8px;padding:6px 0;border-top:1px solid var(--line);font-size:13px;animation:in .25s ease-out}
+@keyframes in{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
 .trace li:first-child{border-top:0}
-.trace .n{color:var(--dim);font-family:var(--mono);font-size:11.5px;padding-top:2px}
-.trace .k{display:inline-block;font-family:var(--mono);font-size:11px;padding:1px 6px;border-radius:4px;margin-right:6px;background:var(--line);color:var(--mut)}
-.trace .k.search{color:var(--accent)}.trace .k.answer{color:var(--ok)}.trace .k.abstain{color:var(--warn)}.trace .k.error{color:var(--bad)}
+.trace .n{color:var(--dim);font-family:var(--mono);font-size:11px;padding-top:2px}
+.trace .k{display:inline-block;font-family:var(--mono);font-size:10.5px;padding:1px 6px;border-radius:4px;margin-right:6px;background:var(--soft);color:var(--mut)}
+.trace .k.search{color:var(--accent);background:var(--accent2)}.trace .k.answer{color:var(--ok);background:var(--ok2)}
+.trace .k.abstain{color:var(--warn);background:var(--warn2)}.trace .k.error{color:var(--bad);background:var(--bad2)}
 .trace .r{color:var(--dim)}
-.meta{display:flex;gap:16px;flex-wrap:wrap;color:var(--dim);font-size:12px;margin-top:14px}
-.cmp{margin-top:16px;border-top:1px solid var(--line);padding-top:12px}
-.cmp>button{background:transparent;border:1px solid var(--line2);color:var(--mut);border-radius:7px;padding:7px 12px;font-size:13px}
-.cmp>button:hover{color:var(--ink);border-color:var(--accent)}
-.cmp .out{margin-top:10px;display:none;grid-template-columns:1fr 1fr;gap:12px}
-.cmp .out.show{display:grid}
-@media(max-width:700px){.cmp .out.show{grid-template-columns:1fr}}
-.box{border:1px solid var(--line);border-radius:8px;padding:10px 12px;background:var(--panel2);font-size:13.5px}
-.box h4{margin:0 0 6px;font-size:11.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--mut)}
-.box .n{color:var(--dim);font-size:12px;margin-top:6px}
-.box.bad{border-color:rgba(255,112,112,.35)}
-.foot{margin-top:28px;border-top:1px solid var(--line);padding-top:14px;color:var(--mut);font-size:12.5px}
-.foot .row{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
-.foot h4{margin:0 0 4px;font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--dim)}
-.foot b{color:var(--ink);font-weight:600}.foot code{background:var(--panel2);padding:1px 5px;border-radius:4px}
+.spin{display:inline-block;width:10px;height:10px;border:2px solid var(--line2);border-top-color:var(--accent);border-radius:50%;animation:sp .8s linear infinite;vertical-align:-1px;margin-left:6px}
+@keyframes sp{to{transform:rotate(360deg)}}
+
+/* outcome */
+.out{margin-top:14px;border:1px solid var(--line);border-radius:12px;background:var(--panel);padding:16px 18px}
+.pill{display:inline-block;font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px}
+.pill.ok{background:var(--ok2);color:var(--ok)}.pill.ab{background:var(--warn2);color:var(--warn)}.pill.er{background:var(--bad2);color:var(--bad)}
+.bubble{margin-top:10px;padding:12px 15px;border-radius:12px;background:var(--accent2);border:1px solid #cfdcff;font-size:14.5px;line-height:1.55;position:relative}
+.bubble .who{font-size:10.5px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--accent);margin-bottom:3px}
+.bubble.hold{background:var(--warn2);border-color:#f3dfb8}.bubble.hold .who{color:var(--warn)}
+.bubble .copy{position:absolute;right:9px;top:9px;background:var(--panel);border:1px solid var(--line2);color:var(--mut);border-radius:6px;padding:2px 8px;font-size:11px}
+.why{color:var(--mut);font-size:13px;margin-top:8px}.why b{color:var(--ink)}
+.bar{position:relative;height:8px;border-radius:6px;background:var(--soft);margin-top:8px}
+.bar .fill{height:100%;border-radius:6px;background:var(--accent);transition:width .4s}
+.bar .tau{position:absolute;top:-4px;width:2px;height:16px;background:var(--warn)}
+.confrow{display:flex;justify-content:space-between;font-size:12px;color:var(--mut);margin-top:6px}
+.cite{margin-top:8px;padding:10px 13px;border-left:3px solid var(--ok);background:var(--soft);border-radius:6px;font-size:13px;color:#374151;line-height:1.55}
+.cite .ct{font-size:11.5px;color:var(--mut);margin-bottom:3px}.cite .ct b{color:var(--ok);font-family:var(--mono)}
+.hand{margin-top:8px;border:1px solid #f3dfb8;background:var(--warn2);border-radius:10px;padding:11px 13px;font-size:13px}
+.hand dl{margin:0;display:grid;grid-template-columns:110px 1fr;gap:4px 10px}.hand dt{color:var(--mut)}.hand dd{margin:0}
+.meta{display:flex;gap:14px;color:var(--dim);font-size:11.5px;margin-top:12px}
+.cmp{margin-top:12px;border-top:1px solid var(--line);padding-top:10px}
+.cmp .o{margin-top:10px;display:none;grid-template-columns:1fr 1fr;gap:10px}.cmp .o.show{display:grid}
+@media(max-width:700px){.cmp .o.show{grid-template-columns:1fr}}
+.box{border:1px solid var(--line);border-radius:8px;padding:9px 11px;background:var(--soft);font-size:13px}
+.box h4{margin:0 0 4px;font-size:10.5px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--mut)}
+.box.bad{border-color:#f5c2c2;background:var(--bad2)}
 .err{color:var(--bad)}
+
+/* help centre */
+.kb input{width:100%;padding:6px 9px;border-radius:6px;border:1px solid var(--line2);font:inherit;font-size:12.5px}
+.cat{font-size:10.5px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--dim);padding:10px 14px 3px}
+.art{padding:6px 14px;border-left:3px solid transparent;cursor:pointer}
+.art:hover{background:var(--soft)}
+.art .t{font-size:12.5px;font-weight:500;display:flex;gap:7px;align-items:baseline}
+.art .t .id{color:var(--dim);font-family:var(--mono);font-size:10.5px;min-width:24px}
+.art .body{display:none;margin:6px 0 2px 31px;color:#4b5563;font-size:12.5px;line-height:1.5}
+.art.open .body{display:block}
+.art.hit{border-left-color:var(--accent);background:var(--accent2)}.art.hit .id{color:var(--accent)}
+.art.cited{border-left-color:var(--ok);background:var(--ok2)}.art.cited .id{color:var(--ok)}
+.legend{padding:7px 14px;border-top:1px solid var(--line);font-size:11px;color:var(--dim);display:flex;gap:12px}
+.legend i{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:4px;vertical-align:middle}
+
+/* modal */
+.modal{position:fixed;inset:0;background:rgba(17,24,39,.35);display:none;align-items:center;justify-content:center;z-index:20}
+.modal.show{display:flex}
+.modal .card{background:var(--panel);border-radius:14px;padding:22px 26px;max-width:560px;width:92%;box-shadow:0 20px 60px rgba(0,0,0,.18)}
+.modal h3{margin:0 0 10px;font-size:16px}
+.modal ol{margin:0;padding-left:18px;color:#374151}.modal li{margin:6px 0}
+.modal .x{float:right;background:none;border:0;color:var(--mut);font-size:18px}
 </style>
 </head>
 <body>
 
 <div class="top">
-  <div class="brand">helpdesk-agent<span class="co" id="co"></span></div>
+  <div class="brand">helpdesk-agent<span id="co"></span></div>
   <div class="sp"></div>
-  <div class="sys" id="sys"></div>
+  <span class="chip" id="chipKey"></span>
+  <span class="chip">model <b id="chipModel"></b></span>
+  <span class="chip">threshold <b id="chipTau"></b></span>
+  <a class="lnk" id="repo" target="_blank">GitHub ↗</a>
 </div>
 
-<div class="hero">
-  <h1>A support agent that replies only from the help centre, cites the article, and escalates to a human when it can't.</h1>
-  <p>Each incoming ticket gets either a <b>reply draft with the article it came from</b>, or an <b>escalation with a
-  hand-off note</b>. The decision is made against a <b>confidence threshold calibrated on labelled tickets</b>, so the
-  rate of wrong replies stays under a target you choose. Every search, decision and failed call is shown.</p>
-  <div class="stats" id="stats"></div>
-  <details class="how">
-    <summary>How this differs from a chatbot bolted onto the same model</summary>
-    <table class="cmp">
-      <tr><th></th><th>Generic support chatbot</th><th>This agent</th></tr>
-      <tr><td>Where replies come from</td><td>The model's training data plus whatever it infers; for a company it has never seen, it invents policy</td><td>Only the help-centre articles on the left; the article is cited</td></tr>
-      <tr><td>Ticket the help centre doesn't cover</td><td>Replies anyway, plausibly</td><td>Escalates, with a hand-off note saying what was searched and why it stopped</td></tr>
-      <tr><td>Confidence</td><td>None, or a self-reported number</td><td>Agreement across N independent samples, gated by a threshold calibrated on 68 labelled tickets for a target error rate</td></tr>
-      <tr><td>Retrieval</td><td>One lookup, if any</td><td>An agent loop: judges whether the articles suffice, reformulates the search when they don't, or stops</td></tr>
-      <tr><td>Visibility</td><td>A reply</td><td>Every search query, decision and sample vote; failures reported as failures, never as "can't answer"</td></tr>
-    </table>
-    <p style="margin-top:8px">Try the "tricky" tickets, then press <b>what a generic chatbot would have said</b> on an escalated one.
-    Full methodology and numbers: <a id="evalLink" href="#">EVALUATION.md</a>.</p>
-  </details>
+<div class="strip">
+  <span class="lead">Replies from the help centre, cites the article, escalates when it can't.</span>
+  <div id="stats" style="display:contents"></div>
+  <span class="sp"></span>
+  <button class="how" onclick="document.getElementById('modal').classList.add('show')">How it works</button>
 </div>
 
 <div class="main">
-  <aside class="side">
-    <div class="hd"><h2>Help centre</h2><div class="nm" id="kbName">loading…</div><div class="ct" id="kbCount"></div>
-      <input id="filter" placeholder="Search articles…"></div>
-    <div class="alist" id="alist"></div>
-    <div class="legend"><span><i style="background:var(--accent)"></i>retrieved for this ticket</span><span><i style="background:var(--ok)"></i>cited in reply</span></div>
+  <aside class="pane inbox">
+    <div class="hd"><h2>Inbox<small id="inboxCount"></small></h2><button class="sbtn" id="runAll">▶ Run all new</button></div>
+    <div class="scroll" id="tklist"></div>
+    <div class="compose">
+      <textarea id="cMsg" placeholder="New ticket: paste a customer message…"></textarea>
+      <div class="row"><input id="cName" placeholder="Customer"><input id="cSubj" placeholder="Subject"><button id="cAdd">Add</button></div>
+    </div>
   </aside>
 
-  <section class="content">
-    <div class="lbl first">Incoming ticket</div>
-    <div class="ticket"><textarea id="q" placeholder="Paste a customer message…" autofocus></textarea><button id="go">Handle ticket</button></div>
-    <div class="ex" id="ex"></div>
-    <div class="card" id="card"></div>
-    <div class="foot" id="foot"></div>
-  </section>
+  <section class="pane"><div class="scroll"><div class="ticket" id="ticket"><div class="empty">Select a ticket, or add one.</div></div></div></section>
+
+  <aside class="pane kb">
+    <div class="hd"><h2>Help centre<small id="kbCount"></small></h2></div>
+    <div style="padding:8px 14px;border-bottom:1px solid var(--line)"><input id="filter" placeholder="Search…"></div>
+    <div class="scroll" id="alist"></div>
+    <div class="legend"><span><i style="background:var(--accent)"></i>retrieved</span><span><i style="background:var(--ok)"></i>cited</span></div>
+  </aside>
+</div>
+
+<div class="modal" id="modal" onclick="if(event.target===this)this.classList.remove('show')">
+  <div class="card"><button class="x" onclick="document.getElementById('modal').classList.remove('show')">×</button>
+    <h3>How it works</h3>
+    <ol>
+      <li><b>Search</b> the help centre for the ticket, then let the agent <b>judge</b>: enough to reply, search again with a reworded query, or stop because it isn't covered.</li>
+      <li><b>Draft</b> several independent replies; confidence = how many agree on the same fact.</li>
+      <li><b>Reply</b> only if confidence clears a threshold <b>calibrated on 68 labelled tickets</b> for a target error rate; otherwise <b>escalate</b> with a hand-off note.</li>
+      <li>A failed model call is shown as <b>model unavailable</b>, never as an escalation.</li>
+    </ol>
+    <p style="color:var(--mut);font-size:13px;margin:12px 0 0">Unlike a chatbot on the same model, it never answers from memory. Try an uncovered ticket and press <b>Compare with a plain chatbot</b>. Numbers and method: <a id="evalLink" href="#" target="_blank">EVALUATION.md</a>.</p>
+  </div>
 </div>
 
 <script>
 const $=s=>document.querySelector(s);
 const esc=s=>(s??'').toString().replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-const pct=x=>(x*100).toFixed(x*100<10?1:0)+'%';
-let META=null, ART=[], lastQ='';
+const pct=x=>(x*100).toFixed(x*100<10&&x>0?1:0)+'%';
+let META=null, ART=[], TICKETS=[], SESSION={}, SEL=null, ES=null, RESULT={}, QUEUE=[];
 
 async function init(){
-  const [m,a]=await Promise.all([fetch('/meta').then(r=>r.json()),fetch('/articles').then(r=>r.json())]);
-  META=m; ART=a.articles;
-  $('#co').textContent=m.company?m.company+' · support':'support';
-  $('#evalLink').href=m.repo+'/blob/main/EVALUATION.md';
-  $('#sys').innerHTML=[
-    `<span class="tag">model <b>${esc(m.model)}</b></span>`,
-    `<span class="tag">retrieval <b>${esc(m.retriever)}</b></span>`,
-    `<span class="tag">samples <b>${m.n_samples}</b></span>`,
-    `<span class="tag">threshold <b>${m.threshold.toFixed(2)}</b></span>`,
-    `<span class="tag ${m.model_key?'live':'down'}">api key <b>${m.model_key?'present':'missing'}</b></span>`,
-    `<a class="tag" href="${esc(m.repo)}" target="_blank">source ↗</a>`].join('');
-  renderStats(m); renderArticles(); renderExamples(m); renderFoot(m);
+  const [m,a,ib]=await Promise.all([fetch('/meta').then(r=>r.json()),fetch('/articles').then(r=>r.json()),fetch('/inbox').then(r=>r.json())]);
+  META=m; ART=a.articles; TICKETS=ib.tickets; SESSION=ib.session;
+  $('#co').textContent=m.company||''; $('#repo').href=m.repo; $('#evalLink').href=m.repo+'/blob/main/EVALUATION.md';
+  $('#chipModel').textContent=m.model; $('#chipTau').textContent=m.threshold.toFixed(2);
+  $('#chipKey').innerHTML=`<span class="dot ${m.model_key?'':'off'}"></span>${m.model_key?'model connected':'no API key'}`;
+  renderStats(); renderInbox(); renderArticles();
 }
-function renderStats(m){
-  const c=m.calibration; if(!c){$('#stats').innerHTML='';return;}
-  $('#stats').innerHTML=`
-    <div class="stat ok"><div class="v">${pct(c.coverage)}</div><div class="l">tickets auto-resolved</div></div>
-    <div class="stat ok"><div class="v">${pct(c.selective_accuracy)}</div><div class="l">accuracy of replies sent</div></div>
-    <div class="stat warn"><div class="v">${pct(c.hallucination)}<small>vs ${pct(c.trust_hallucination)} w/o threshold</small></div><div class="l">wrong replies to uncovered tickets</div></div>
-    <div class="stat"><div class="v">≤ ${pct(c.alpha)}<small>measured ${pct(c.selective_error)}</small></div><div class="l">error target on replies (held-out)</div></div>`;
+function renderStats(){
+  const c=META.calibration; if(!c){$('#stats').innerHTML='';return;}
+  $('#stats').innerHTML=`<span class="stat ok"><b>${pct(c.coverage)}</b><span>auto-resolved</span></span>
+    <span class="stat ok"><b>${pct(c.selective_accuracy)}</b><span>reply accuracy</span></span>
+    <span class="stat warn"><b>${pct(c.hallucination)}</b><span>wrong replies on uncovered tickets</span></span>
+    <span class="stat"><b>${pct(c.selective_error)}</b><span>error, target ≤ ${pct(c.alpha)}</span></span>`;
+}
+function ago(ts){const d=Date.now()/1000-ts;if(d<60)return 'now';if(d<3600)return Math.round(d/60)+'m';if(d<86400)return Math.round(d/3600)+'h';return Math.round(d/86400)+'d';}
+function renderInbox(){
+  const n=TICKETS.filter(t=>t.status==='new').length, s=SESSION||{};
+  $('#inboxCount').textContent=`${n} new · ${(s['auto-resolved']||0)+(s.sent||0)} resolved · ${s.escalated||0} escalated`;
+  $('#runAll').disabled=!n||!!ES;
+  $('#tklist').innerHTML=TICKETS.map(t=>`<div class="tk ${SEL===t.id?'sel':''}" onclick="select(${t.id})">
+    <div class="r1"><span class="who">${esc(t.customer)}</span><span class="ago">${ago(t.received)}</span></div>
+    <div class="sub">${esc(t.subject||t.message)}</div><span class="st ${t.status}">${t.status.replace('-',' ')}</span></div>`).join('');
 }
 function renderArticles(f=''){
-  const q=f.trim().toLowerCase();
-  const items=ART.filter(p=>!q||p.title.toLowerCase().includes(q)||p.text.toLowerCase().includes(q));
+  const q=f.trim().toLowerCase(); const items=ART.filter(p=>!q||p.title.toLowerCase().includes(q)||p.text.toLowerCase().includes(q));
   let html='',cat=null;
-  for(const p of items){
-    if(p.category!==cat){cat=p.category;html+=`<div class="cat">${esc(p.category_name)}</div>`;}
-    html+=`<div class="art" id="a${p.id}" onclick="this.classList.toggle('open')"><div class="t"><span class="id">#${p.id}</span><span>${esc(p.title)}</span></div><div class="body">${esc(p.text)}</div></div>`;
-  }
-  $('#alist').innerHTML=html||'<div class="cat">no matches</div>';
-  $('#kbName').textContent=META.kb_name; $('#kbCount').textContent=`${ART.length} articles · ${Object.keys(META.categories).length} categories`;
+  for(const p of items){ if(p.category!==cat){cat=p.category;html+=`<div class="cat">${esc(p.category_name)}</div>`;}
+    html+=`<div class="art" id="a${p.id}" onclick="this.classList.toggle('open')"><div class="t"><span class="id">#${p.id}</span><span>${esc(p.title)}</span></div><div class="body">${esc(p.text)}</div></div>`;}
+  $('#alist').innerHTML=html||'<div class="cat">no matches</div>'; $('#kbCount').textContent=`${ART.length} articles`;
 }
 $('#filter').addEventListener('input',e=>renderArticles(e.target.value));
-function renderExamples(m){
-  if(!m.examples){$('#ex').innerHTML='';return;}
-  const g=(t,arr)=>`<div><h3>${t}</h3>${arr.map(e=>`<button class="chip" onclick="askQ(${JSON.stringify(e)})">${esc(e)}</button>`).join('')}</div>`;
-  $('#ex').innerHTML=g('Covered by the help centre',m.examples.resolvable)+g('Should escalate',m.examples.escalate)+g('Tricky',m.examples.tricky);
-}
-function renderFoot(m){
-  const c=m.calibration;
-  $('#foot').innerHTML=`<div class="row">
-    <div><h4>Escalation threshold</h4><b>${m.threshold.toFixed(2)}</b> · ${esc(m.threshold_source)}</div>
-    <div><h4>Calibration</h4>${c?`${c.n} labelled tickets (${c.n_unanswerable} uncovered) · ${c.n_test} held out · target error <b>${pct(c.alpha)}</b>, measured <b>${pct(c.selective_error)}</b> · ECE <b>${c.ece.toFixed(3)}</b>`:'no calibration file for this corpus; default threshold in use'}</div>
-    <div><h4>Agent</h4>up to <b>${m.max_steps}</b> decision steps · <b>${m.n_samples}</b> answer samples · ~${m.n_samples+1} model calls per ticket</div>
-    <div><h4>Your own help centre</h4><code>python ingest.py ./docs --name "Acme"</code> then <code>python serve.py</code>; calibrate with your tickets (EVALUATION.md)</div>
-  </div>`;
-}
-function askQ(q){$('#q').value=q;ask();}
-$('#go').onclick=ask;
-$('#q').addEventListener('keydown',e=>{if(e.key==='Enter'&&(e.metaKey||e.ctrlKey))ask();});
-
-async function ask(){
-  const q=$('#q').value.trim(); if(!q) return; lastQ=q;
-  const go=$('#go'),card=$('#card'); go.disabled=true; card.classList.add('show');
-  card.innerHTML=`<span class="pill wk">WORKING</span><div class="q">${esc(q)}</div><div class="why" style="margin-top:8px">searching the help centre, letting the agent judge the articles, then sampling ${META?META.n_samples:5} replies for a confidence…</div>`;
-  document.querySelectorAll('.art').forEach(p=>p.classList.remove('hit','cited'));
-  try{
-    const r=await fetch('/ticket',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:q})});
-    const d=await r.json(); if(d.error&&!d.status) throw new Error(d.error); render(d);
-  }catch(e){card.innerHTML=`<span class="pill er">ERROR</span><div class="why err" style="margin-top:8px">${esc(e.message||e)}</div>`;}
-  go.disabled=false;
-}
-function traceHTML(steps){
-  if(!steps||!steps.length) return '';
-  const row=(i,k,cls,txt,r)=>`<li><span class="n">${i}</span><span><span class="k ${cls}">${k}</span>${txt}${r?` <span class="r">· ${esc(r)}</span>`:''}</span></li>`;
-  return `<div class="lbl">Agent trace</div><div class="trace"><ol>`+steps.map((s,i)=>{const n=i+1;
-    if(s.action==='search') return row(n,'search','search',`“${esc(s.query)}” → ${s.ids.length} article(s), ${s.new} new: ${s.ids.map(x=>'#'+x).join(' ')}`);
-    if(s.action==='decide'&&s.error) return row(n,'error','error',`decision call failed (${esc(s.error)}); proceeding to a reply attempt`);
-    if(s.action==='decide'&&s.next==='search') return row(n,'decide','decide',`articles insufficient → reformulate: “${esc(s.query)}”`,s.reason);
-    if(s.action==='decide') return row(n,'decide','answer',`articles sufficient → draft reply`,s.reason);
-    if(s.action==='abstain') return row(n,'abstain','abstain',`not covered by the help centre → escalate`,s.reason);
-    if(s.action==='sample') return row(n,'sample',s.errors?'error':'answer',`${s.n} independent reply samples: ${s.votes} found a supported answer${s.errors?`, ${s.errors} failed (${esc(s.error)})`:''}`);
-    return row(n,s.action,'',JSON.stringify(s));}).join('')+`</ol></div>`;
-}
-function confHTML(d){
-  const p=Math.round(d.confidence*100),t=Math.round(d.threshold*100);
-  return `<div class="lbl">Confidence vs calibrated threshold</div><div class="bar"><div class="fill" style="width:${p}%"></div><div class="tau" style="left:${t}%"></div></div>
-    <div class="confrow"><span>${d.votes_total?`${d.votes} of ${d.votes_total} samples found an answer · ${d.confidence.toFixed(2)} agreed on the same one`:`confidence ${d.confidence.toFixed(2)}`}</span><span>reply if ≥ ${d.threshold.toFixed(2)}</span></div>`;
-}
-function render(d){
-  const card=$('#card'); let h='';
-  if(d.status==='resolved'){
-    h=`<span class="pill ok">AUTO-RESOLVED</span><div class="q">${esc(d.question)}</div>
-      <div class="bubble"><div class="who">Reply draft</div>${esc(d.reply)}<button class="copy" onclick="navigator.clipboard&&navigator.clipboard.writeText(${JSON.stringify(d.reply)});this.textContent='copied'">copy</button></div>
-      <div class="fact">key fact: <b>${esc(d.answer)}</b></div><div class="why">${esc(d.reason)}</div>`+confHTML(d)+
-      (d.citation?`<div class="lbl">Source article</div><div class="cite"><div class="ct"><b>#${d.citation.id}</b> ${esc(d.citation.title)} · ${esc(d.citation.category)} · <a href="#" onclick="jump(${d.citation.id});return false">open</a></div>${esc(d.citation.text)}</div>`:'');
-  }else if(d.status==='escalated'){
-    const ho=d.handoff||{};
-    h=`<span class="pill ab">ESCALATED TO A HUMAN</span><div class="q">${esc(d.question)}</div>
-      <div class="why" style="margin-top:10px"><b>${esc(d.reason_title)}</b> — ${esc(d.reason)}</div>
-      <div class="lbl">Hand-off note for the agent picking this up</div>
-      <div class="hand"><dl>
-        <dt>Searched</dt><dd>${(ho.searched||[]).map(s=>`“${esc(s)}”`).join(' · ')||'—'}</dd>
-        <dt>Closest articles</dt><dd>${(ho.closest||[]).map(c=>`<a href="#" onclick="jump(${c.id});return false">#${c.id} ${esc(c.title)}</a> <span style="color:var(--dim)">(${esc(c.category)})</span>`).join('<br>')||'none'}</dd>
-        <dt>Why not auto-resolved</dt><dd>${esc(ho.reason||d.reason)}</dd></dl>
-        <div class="act"><b>Suggested action:</b> ${esc(ho.suggested_action||'')}</div></div>
-      <div class="bubble" style="background:#1d1a12;border-color:#3a3320"><div class="who" style="color:var(--warn)">Holding reply to customer</div>${esc(ho.holding_reply||'')}<button class="copy" onclick="navigator.clipboard&&navigator.clipboard.writeText(${JSON.stringify(ho.holding_reply||'')});this.textContent='copied'">copy</button></div>`+
-      (d.reason_code!=='not_in_documents'?confHTML(d):'');
-  }else{
-    h=`<span class="pill er">MODEL UNAVAILABLE</span><div class="q">${esc(d.question)}</div>
-      <div class="why err" style="margin-top:10px">${esc(d.reason)}</div>
-      <div class="why">An infrastructure failure, not an escalation: the agent never got a judgement from the model. Retry, or check the API key and quota.</div>`;
-  }
-  card.innerHTML=h+traceHTML(d.steps)+
-    `<div class="meta"><span>${d.latency_ms} ms</span><span>${d.llm_calls} model call(s)</span><span>${d.retrieved.length} article(s) gathered: ${d.retrieved.map(x=>'#'+x).join(' ')}</span></div>`+
-    `<div class="cmp"><button onclick="compare()">What a generic chatbot would have said (same model, no help centre)</button><div class="out" id="cmpOut"></div></div>`;
-  (d.retrieved||[]).forEach(id=>{const el=document.getElementById('a'+id);if(el)el.classList.add('hit');});
-  if(d.citation){const el=document.getElementById('a'+d.citation.id);if(el)el.classList.add('cited');}
-}
+function markKB(ret,cite){document.querySelectorAll('.art').forEach(p=>p.classList.remove('hit','cited'));
+  (ret||[]).forEach(id=>{const el=document.getElementById('a'+id);if(el)el.classList.add('hit');});
+  if(cite!=null){const el=document.getElementById('a'+cite);if(el)el.classList.add('cited');}}
 function jump(id){const el=document.getElementById('a'+id);if(!el)return;el.classList.add('open');el.scrollIntoView({behavior:'smooth',block:'center'});}
-async function compare(){
-  const out=$('#cmpOut'); out.classList.add('show');
-  out.innerHTML=`<div class="box bad"><h4>Generic chatbot</h4>asking…</div><div class="box"><h4>This agent</h4>see above</div>`;
-  const r=await fetch('/compare',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:lastQ})});
-  const d=await r.json();
-  out.innerHTML=`<div class="box bad"><h4>Generic chatbot · same model, no help centre</h4>${d.error?`<span class="err">${esc(d.error)}</span>`:esc(d.reply)}
-      <div class="n">Nothing here can be checked against an article. Northwind Workspace is fictional, so any policy stated above was made up.</div></div>
-    <div class="box"><h4>This agent</h4>Replied only if an article supports it (cited), otherwise escalated with a hand-off note.<div class="n">That is the whole point: on a real company's help centre, a confident wrong reply costs more than a short wait for a human.</div></div>`;
+
+/* ticket */
+function select(id){ if(ES) return; SEL=id; renderInbox(); const t=TICKETS.find(x=>x.id===id); renderTicket(t);
+  if(t.status==='new') handle(id); else if(RESULT[id]){renderTrace(RESULT[id].steps,true);renderOutcome(t,RESULT[id]);} else markKB([],null); }
+function renderTicket(t){
+  $('#ticket').innerHTML=`<div class="thead"><div><div class="subj">${esc(t.subject||'(no subject)')}</div><div class="from">${esc(t.customer)} · ${ago(t.received)} ago · <span class="st ${t.status}" style="margin:0">${t.status.replace('-',' ')}</span></div></div><div id="topActions"></div></div>
+    <div class="msg">${esc(t.message)}</div>
+    <div class="lbl">Agent <span id="working"></span></div><div class="trace"><ol id="traceList"></ol></div>
+    <div id="outcome"></div>`;
+  const a=$('#topActions');
+  if(t.status==='new'||t.status==='error') a.innerHTML=`<button class="btn pri sm" onclick="handle(${t.id})">${t.status==='error'?'Retry':'Handle'}</button>`;
+  else if(t.status!=='handling') a.innerHTML=`<button class="btn sm" onclick="reopen(${t.id})">Re-run</button>`;
 }
+function stepLine(s,i){
+  const row=(k,cls,txt,r)=>`<li><span class="n">${i}</span><span><span class="k ${cls}">${k}</span>${txt}${r?` <span class="r">· ${esc(r)}</span>`:''}</span></li>`;
+  if(s.action==='search') return row('search','search',`“${esc(s.query)}” → ${s.ids.map(x=>'#'+x).join(' ')}`);
+  if(s.action==='decide'&&s.error) return row('error','error',`decision call failed: ${esc(s.error)}`);
+  if(s.action==='decide'&&s.next==='search') return row('decide','decide',`not enough → search again: “${esc(s.query)}”`,s.reason);
+  if(s.action==='decide') return row('decide','answer',`enough to reply`,s.reason);
+  if(s.action==='abstain') return row('decide','abstain',`not covered → escalate`,s.reason);
+  if(s.action==='sampling') return row('draft','answer',`drafting ${s.n} replies in parallel…`);
+  if(s.action==='sample') return row('draft',s.errors?'error':'answer',`${s.votes}/${s.n} found an answer · ${(s.agreement*100).toFixed(0)}% agree${s.errors?` · ${s.errors} failed: ${esc(s.error)}`:''}`);
+  return row(s.action,'',JSON.stringify(s));
+}
+function renderTrace(steps,done){ $('#traceList').innerHTML=steps.map((s,i)=>stepLine(s,i+1)).join(''); $('#working').innerHTML=done?'':'<span class="spin"></span>';
+  const ret=[]; steps.forEach(s=>{if(s.action==='search')s.ids.forEach(x=>{if(!ret.includes(x))ret.push(x);});}); markKB(ret,null); }
+function handle(id){
+  if(ES) return; const t=TICKETS.find(x=>x.id===id); t.status='handling'; renderInbox(); renderTicket(t);
+  const steps=[]; renderTrace(steps,false);
+  ES=new EventSource(`/inbox/${id}/stream`);
+  ES.addEventListener('step',e=>{steps.push(JSON.parse(e.data));renderTrace(steps,false);});
+  ES.addEventListener('done',e=>{ ES.close(); ES=null; const d=JSON.parse(e.data);
+    if(d.error){t.status='error';renderInbox();renderTicket(t);$('#outcome').innerHTML=`<div class="out"><span class="pill er">ERROR</span><div class="why err">${esc(d.error)}</div></div>`;return;}
+    RESULT[id]=d.result; Object.assign(t,d.ticket); SESSION=d.session; renderInbox(); renderTicket(t); renderTrace(d.result.steps,true); renderOutcome(t,d.result);
+    if(QUEUE.length) setTimeout(runNext,400); });
+  ES.onerror=()=>{ if(ES){ES.close();ES=null;} t.status='error'; renderInbox(); renderTicket(t); $('#outcome').innerHTML=`<div class="out"><span class="pill er">CONNECTION LOST</span><div class="why">Retry.</div></div>`; };
+}
+function confHTML(d){ const p=Math.round(d.confidence*100),t=Math.round(d.threshold*100);
+  return `<div class="lbl">Confidence</div><div class="bar"><div class="fill" style="width:${p}%"></div><div class="tau" style="left:${t}%"></div></div>
+    <div class="confrow"><span>${d.votes_total?`${d.votes}/${d.votes_total} drafts found an answer · ${(d.confidence*100).toFixed(0)}% agree`:`${(d.confidence*100).toFixed(0)}%`}</span><span>threshold ${d.threshold.toFixed(2)}</span></div>`; }
+function renderOutcome(t,d){
+  let h='';
+  if(d.status==='resolved'){ const sent=t.status==='sent';
+    h=`<div class="out"><span class="pill ok">${sent?'Reply sent':'Resolved · reply ready'}</span>
+      <div class="bubble"><div class="who">Reply</div>${esc(d.reply)}<button class="copy" onclick="navigator.clipboard&&navigator.clipboard.writeText(${JSON.stringify(d.reply)});this.textContent='copied'">copy</button></div>
+      <div class="actions">${sent?'':`<button class="btn ok" onclick="send(${t.id})">Send reply</button><button class="btn warn" onclick="escalate(${t.id})">Escalate instead</button>`}</div>`+confHTML(d)+
+      (d.citation?`<div class="lbl">Source</div><div class="cite"><div class="ct"><b>#${d.citation.id}</b> ${esc(d.citation.title)} · ${esc(d.citation.category)} · <a href="#" onclick="jump(${d.citation.id});return false">open</a></div>${esc(d.citation.text)}</div>`:'');
+    markKB(d.retrieved,d.citation?d.citation.id:null);
+  }else if(d.status==='escalated'){ const ho=d.handoff||{};
+    h=`<div class="out"><span class="pill ab">Escalated to a human</span><div class="why"><b>${esc(d.reason_title)}.</b> ${esc(d.reason)}</div>
+      <div class="lbl">Hand-off note</div><div class="hand"><dl><dt>Searched</dt><dd>${(ho.searched||[]).map(s=>`“${esc(s)}”`).join(' · ')||'—'}</dd>
+        <dt>Closest articles</dt><dd>${(ho.closest||[]).map(c=>`<a href="#" onclick="jump(${c.id});return false">${esc(c.title)}</a>`).join(' · ')||'none'}</dd>
+        <dt>Next step</dt><dd>${esc(ho.suggested_action||'')}</dd></dl></div>
+      <div class="bubble hold"><div class="who">Holding reply</div>${esc(ho.holding_reply||'')}<button class="copy" onclick="navigator.clipboard&&navigator.clipboard.writeText(${JSON.stringify(ho.holding_reply||'')});this.textContent='copied'">copy</button></div>`+
+      (d.reason_code!=='not_in_documents'?confHTML(d):'');
+    markKB(d.retrieved,null);
+  }else{
+    h=`<div class="out"><span class="pill er">Model unavailable</span><div class="why err">${esc(d.reason)}</div><div class="why">Not an escalation: the model never answered. Check the API key or quota and retry.</div>
+      <div class="actions"><button class="btn pri sm" onclick="reopen(${t.id},true)">Retry</button></div>`;
+  }
+  h+=`<div class="meta"><span>${d.latency_ms} ms</span><span>${d.llm_calls} model calls</span></div>
+    <div class="cmp"><button class="btn sm" onclick="compare(${t.id})">Compare with a plain chatbot</button><div class="o" id="cmpOut"></div></div></div>`;
+  $('#outcome').innerHTML=h;
+}
+async function post(url,body){const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body||{})});return r.json();}
+async function send(id){const d=await post(`/inbox/${id}/send`); if(d.ticket){Object.assign(TICKETS.find(x=>x.id===id),d.ticket);SESSION=d.session;renderInbox();select(id);}}
+async function escalate(id){const d=await post(`/inbox/${id}/escalate`); if(d.ticket){const t=TICKETS.find(x=>x.id===id);Object.assign(t,d.ticket);SESSION=d.session;renderInbox();renderTicket(t);renderTrace(RESULT[id]?RESULT[id].steps:[],true);
+  $('#outcome').innerHTML=`<div class="out"><span class="pill ab">Escalated by you</span><div class="why">Sent to the human queue with the agent's trace attached.</div></div>`;}}
+async function reopen(id,run){const d=await post(`/inbox/${id}/reopen`); if(d.ticket){const t=TICKETS.find(x=>x.id===id);Object.assign(t,d.ticket);SESSION=d.session;renderInbox(); if(run!==false) handle(id);}}
+async function compare(id){ const out=$('#cmpOut'); out.classList.add('show'); const t=TICKETS.find(x=>x.id===id);
+  out.innerHTML=`<div class="box bad"><h4>Plain chatbot · same model, no help centre</h4>…</div><div class="box"><h4>This agent</h4>see above</div>`;
+  const d=await post('/compare',{message:t.message});
+  out.innerHTML=`<div class="box bad"><h4>Plain chatbot · same model, no help centre</h4>${d.error?`<span class="err">${esc(d.error)}</span>`:esc(d.reply)}</div>
+    <div class="box"><h4>This agent</h4>${d.error?'':(RESULT[id].status==='resolved'?'Replied from a cited article.':'Escalated: the help centre does not cover this. '+esc(META.company)+' is fictional, so anything the chatbot stated was invented.')}</div>`; }
+
+/* compose + run-all */
+$('#cAdd').onclick=async()=>{ const msg=$('#cMsg').value.trim(); if(!msg||ES) return;
+  const d=await post('/inbox',{message:msg,customer:$('#cName').value.trim(),subject:$('#cSubj').value.trim()});
+  TICKETS.unshift(d.ticket); SESSION=d.session; $('#cMsg').value='';$('#cSubj').value='';$('#cName').value=''; renderInbox(); select(d.ticket.id); };
+$('#runAll').onclick=()=>{ if(ES) return; QUEUE=TICKETS.filter(t=>t.status==='new').map(t=>t.id).reverse(); runNext(); };
+function runNext(){ const id=QUEUE.shift(); if(id===undefined) return; SEL=id; renderInbox(); const t=TICKETS.find(x=>x.id===id); renderTicket(t); handle(id); }
 init();
 </script>
 </body>
