@@ -8,8 +8,10 @@ watch, and each ends in a state a team can act on:
                    ↘ escalated                      (hand-off note attached, human queue)
                    ↘ error                          (model unavailable; retry)
 
-State is in memory (one process, one demo) and every transition is appended to the JSONL
-trace so the session is auditable. Thread-safe: the server handles tickets concurrently.
+Transitions are enforced (`TRANSITIONS`), a ticket stuck in `handling` (server died mid-run,
+client vanished) becomes claimable again after `STALE_SECONDS`, and the inbox is capped so a
+public demo cannot be filled without bound. State is in memory (one process); every change is
+appended to the JSONL trace. Thread-safe.
 """
 
 from __future__ import annotations
@@ -25,13 +27,28 @@ from . import trace
 SEED = os.path.join(os.path.dirname(__file__), "..", "knowledge_base", "inbox.json")
 
 VALID = {"new", "handling", "auto-resolved", "escalated", "sent", "error"}
+TRANSITIONS = {
+    "new": {"handling", "escalated"},
+    "handling": {"auto-resolved", "escalated", "error", "new"},
+    "auto-resolved": {"sent", "escalated", "new"},
+    "escalated": {"new"},
+    "sent": set(),                      # final
+    "error": {"new", "handling", "escalated"},
+}
+STALE_SECONDS = 180
+MAX_TICKETS = 200
+
+
+class TransitionError(ValueError):
+    pass
 
 
 class Inbox:
-    def __init__(self, seed_path: str | None = SEED) -> None:
+    def __init__(self, seed_path: str | None = SEED, max_tickets: int = MAX_TICKETS) -> None:
         self._lock = threading.Lock()
         self._ids = itertools.count(1)
         self._tickets: dict[int, dict] = {}
+        self.max_tickets = max_tickets
         if seed_path and os.path.exists(seed_path):
             with open(seed_path) as f:
                 seed = json.load(f)
@@ -45,20 +62,39 @@ class Inbox:
     def add(self, message: str, customer: str = "", subject: str = "",
             received: float | None = None) -> dict:
         with self._lock:
+            if len(self._tickets) >= self.max_tickets:
+                # drop the oldest *finished* ticket to make room; never drop live work
+                for tid, t in sorted(self._tickets.items(), key=lambda kv: kv[1]["received"]):
+                    if t["status"] in ("sent", "escalated", "error"):
+                        del self._tickets[tid]
+                        break
+                else:
+                    raise TransitionError("inbox is full")
             tid = next(self._ids)
-            t = {"id": tid, "customer": customer or "Customer", "subject": subject or "",
-                 "message": message.strip(), "received": received or time.time(),
-                 "status": "new", "result": None, "handled_at": None, "sent_at": None}
+            t = {"id": tid, "customer": (customer or "Customer")[:60],
+                 "subject": (subject or "")[:120], "message": message.strip(),
+                 "received": received or time.time(), "status": "new", "result": None,
+                 "started_at": None, "handled_at": None, "sent_at": None}
             self._tickets[tid] = t
-        trace.log({"inbox": "add", "id": tid, "subject": subject[:80]})
+        trace.log({"inbox": "add", "id": tid, "subject": t["subject"][:80]})
         return self._public(t)
 
     def set_status(self, tid: int, status: str, result: dict | None = None) -> dict:
         if status not in VALID:
-            raise ValueError(f"bad status {status!r}")
+            raise TransitionError(f"unknown status {status!r}")
         with self._lock:
-            t = self._tickets[tid]
+            t = self._tickets[tid]              # KeyError → caller maps to 404
+            cur = t["status"]
+            if cur == "handling" and status == "handling":
+                if time.time() - (t["started_at"] or 0) < STALE_SECONDS:
+                    raise TransitionError("ticket is already being handled")
+            elif status not in TRANSITIONS[cur]:
+                raise TransitionError(f"cannot move a ticket from {cur} to {status}")
             t["status"] = status
+            if status == "handling":
+                t["started_at"] = time.time()
+            if status == "new":
+                t["result"], t["started_at"], t["handled_at"], t["sent_at"] = None, None, None, None
             if result is not None:
                 t["result"] = result
                 t["handled_at"] = time.time()

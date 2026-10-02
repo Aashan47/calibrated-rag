@@ -13,12 +13,13 @@
 }
 *{box-sizing:border-box}
 html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif}
+body{display:flex;flex-direction:column}
 a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}
 button{font:inherit;cursor:pointer}
 .mono{font-family:var(--mono);font-size:12px}
 
 /* top */
-.top{display:flex;align-items:center;gap:12px;height:52px;padding:0 20px;background:var(--panel);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5}
+.top{display:flex;align-items:center;gap:12px;height:52px;padding:0 20px;background:var(--panel);border-bottom:1px solid var(--line);flex:none}
 .brand{font-weight:700;font-size:15px}.brand span{color:var(--mut);font-weight:400;margin-left:8px}
 .top .sp{flex:1}
 .chip{font-size:12px;color:var(--mut);border:1px solid var(--line);border-radius:6px;padding:3px 9px;background:var(--panel)}
@@ -27,7 +28,7 @@ button{font:inherit;cursor:pointer}
 .lnk{font-size:12px;color:var(--mut)}
 
 /* stats strip */
-.strip{display:flex;align-items:center;gap:10px;padding:12px 20px;border-bottom:1px solid var(--line);background:var(--panel);flex-wrap:wrap}
+.strip{display:flex;align-items:center;gap:10px;padding:10px 20px;border-bottom:1px solid var(--line);background:var(--panel);flex-wrap:wrap;flex:none}
 .strip .lead{font-size:14px;color:var(--ink);margin-right:8px}
 .stat{display:flex;align-items:baseline;gap:7px;padding:6px 12px;border:1px solid var(--line);border-radius:8px;background:var(--panel)}
 .stat b{font-size:17px;font-weight:700}.stat span{font-size:12px;color:var(--mut)}
@@ -36,13 +37,13 @@ button{font:inherit;cursor:pointer}
 .how{font-size:13px;color:var(--accent);background:none;border:0;padding:0}
 
 /* layout */
-.main{display:grid;grid-template-columns:290px 1fr 300px;height:calc(100vh - 52px - 57px)}
+.main{display:grid;grid-template-columns:290px 1fr 300px;grid-template-rows:minmax(0,1fr);flex:1;min-height:0}
 @media(max-width:1100px){.main{grid-template-columns:270px 1fr}.kb{display:none}}
-@media(max-width:760px){.main{grid-template-columns:1fr;height:auto}.inbox{max-height:48vh}}
+@media(max-width:760px){.main{grid-template-columns:1fr;grid-template-rows:auto;flex:none}.inbox{max-height:48vh}.pane{height:auto}.chip,.lnk{display:none}.brand span{display:none}}
 .pane{display:flex;flex-direction:column;min-height:0;border-right:1px solid var(--line);background:var(--panel)}
 .pane:last-child{border-right:0}
-.hd{padding:12px 16px 10px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;gap:8px}
-.hd h2{margin:0;font-size:13px;font-weight:700}.hd small{color:var(--mut);font-weight:400;margin-left:6px}
+.hd{padding:11px 16px 9px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;gap:8px}
+.hd h2{margin:0;font-size:13px;font-weight:700;line-height:1.3}.hd small{display:block;color:var(--mut);font-weight:400;font-size:11.5px;white-space:nowrap}
 .scroll{overflow:auto;flex:1;min-height:0}
 .sbtn{font-size:12px;padding:5px 10px;border-radius:6px;border:1px solid var(--line2);background:var(--panel);color:var(--ink);font-weight:600;white-space:nowrap}
 .sbtn:hover{border-color:var(--accent);color:var(--accent)}.sbtn:disabled{opacity:.45;cursor:default}
@@ -60,8 +61,8 @@ button{font:inherit;cursor:pointer}
 .compose textarea{width:100%;min-height:54px;padding:8px 10px;border-radius:6px;border:1px solid var(--line2);background:var(--panel);font:inherit;font-size:13px;resize:vertical}
 .compose textarea:focus,.kb input:focus{outline:none;border-color:var(--accent)}
 .compose .row{display:flex;gap:6px;margin-top:6px}
-.compose input{flex:1;padding:6px 9px;border-radius:6px;border:1px solid var(--line2);background:var(--panel);font:inherit;font-size:12.5px}
-.compose button{padding:6px 12px;border:0;border-radius:6px;background:var(--accent);color:#fff;font-weight:600;font-size:12.5px}
+.compose input{flex:1;min-width:0;padding:6px 9px;border-radius:6px;border:1px solid var(--line2);background:var(--panel);font:inherit;font-size:12.5px}
+.compose button{flex:none;padding:6px 12px;border:0;border-radius:6px;background:var(--accent);color:#fff;font-weight:600;font-size:12.5px}
 
 /* ticket */
 .ticket{padding:18px 24px 40px;max-width:860px}
@@ -104,6 +105,8 @@ button{font:inherit;cursor:pointer}
 .bar .tau{position:absolute;top:-4px;width:2px;height:16px;background:var(--warn)}
 .confrow{display:flex;justify-content:space-between;font-size:12px;color:var(--mut);margin-top:6px}
 .cite{margin-top:8px;padding:10px 13px;border-left:3px solid var(--ok);background:var(--soft);border-radius:6px;font-size:13px;color:#374151;line-height:1.55}
+.cite .tx{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}.cite.open .tx{display:block}
+.cite .more{color:var(--accent);font-size:12px;cursor:pointer;margin-top:4px}
 .cite .ct{font-size:11.5px;color:var(--mut);margin-bottom:3px}.cite .ct b{color:var(--ok);font-family:var(--mono)}
 .hand{margin-top:8px;border:1px solid #f3dfb8;background:var(--warn2);border-radius:10px;padding:11px 13px;font-size:13px}
 .hand dl{margin:0;display:grid;grid-template-columns:110px 1fr;gap:4px 10px}.hand dt{color:var(--mut)}.hand dd{margin:0}
@@ -115,6 +118,8 @@ button{font:inherit;cursor:pointer}
 .box h4{margin:0 0 4px;font-size:10.5px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--mut)}
 .box.bad{border-color:#f5c2c2;background:var(--bad2)}
 .err{color:var(--bad)}
+.toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%) translateY(20px);background:#111827;color:#fff;padding:9px 14px;border-radius:8px;font-size:13px;opacity:0;transition:.2s;pointer-events:none;z-index:30;max-width:90%}
+.toast.show{opacity:1;transform:translateX(-50%)}
 
 /* help centre */
 .kb input{width:100%;padding:6px 9px;border-radius:6px;border:1px solid var(--line2);font:inherit;font-size:12.5px}
@@ -145,7 +150,6 @@ button{font:inherit;cursor:pointer}
   <div class="brand">helpdesk-agent<span id="co"></span></div>
   <div class="sp"></div>
   <span class="chip" id="chipKey"></span>
-  <span class="chip">model <b id="chipModel"></b></span>
   <span class="chip">threshold <b id="chipTau"></b></span>
   <a class="lnk" id="repo" target="_blank">GitHub ↗</a>
 </div>
@@ -159,10 +163,10 @@ button{font:inherit;cursor:pointer}
 
 <div class="main">
   <aside class="pane inbox">
-    <div class="hd"><h2>Inbox<small id="inboxCount"></small></h2><button class="sbtn" id="runAll">▶ Run all new</button></div>
+    <div class="hd"><h2>Inbox<small id="inboxCount"></small></h2><button class="sbtn" id="runAll">▶ Run all</button></div>
     <div class="scroll" id="tklist"></div>
     <div class="compose">
-      <textarea id="cMsg" placeholder="New ticket: paste a customer message…"></textarea>
+      <textarea id="cMsg" maxlength="2000" placeholder="New ticket: paste a customer message…"></textarea>
       <div class="row"><input id="cName" placeholder="Customer"><input id="cSubj" placeholder="Subject"><button id="cAdd">Add</button></div>
     </div>
   </aside>
@@ -200,8 +204,8 @@ async function init(){
   const [m,a,ib]=await Promise.all([fetch('/meta').then(r=>r.json()),fetch('/articles').then(r=>r.json()),fetch('/inbox').then(r=>r.json())]);
   META=m; ART=a.articles; TICKETS=ib.tickets; SESSION=ib.session;
   $('#co').textContent=m.company||''; $('#repo').href=m.repo; $('#evalLink').href=m.repo+'/blob/main/EVALUATION.md';
-  $('#chipModel').textContent=m.model; $('#chipTau').textContent=m.threshold.toFixed(2);
-  $('#chipKey').innerHTML=`<span class="dot ${m.model_key?'':'off'}"></span>${m.model_key?'model connected':'no API key'}`;
+  $('#chipTau').textContent=m.threshold.toFixed(2);
+  $('#chipKey').innerHTML=`<span class="dot ${m.model_key?'':'off'}"></span><b>${esc(m.model)}</b>${m.model_key?'':' · no API key'}`;
   renderStats(); renderInbox(); renderArticles();
 }
 function renderStats(){
@@ -214,7 +218,7 @@ function renderStats(){
 function ago(ts){const d=Date.now()/1000-ts;if(d<60)return 'now';if(d<3600)return Math.round(d/60)+'m';if(d<86400)return Math.round(d/3600)+'h';return Math.round(d/86400)+'d';}
 function renderInbox(){
   const n=TICKETS.filter(t=>t.status==='new').length, s=SESSION||{};
-  $('#inboxCount').textContent=`${n} new · ${(s['auto-resolved']||0)+(s.sent||0)} resolved · ${s.escalated||0} escalated`;
+  const done=(s['auto-resolved']||0)+(s.sent||0)+(s.escalated||0); $('#inboxCount').textContent=`${n} new · ${done} handled`;
   $('#runAll').disabled=!n||!!ES;
   $('#tklist').innerHTML=TICKETS.map(t=>`<div class="tk ${SEL===t.id?'sel':''}" onclick="select(${t.id})">
     <div class="r1"><span class="who">${esc(t.customer)}</span><span class="ago">${ago(t.received)}</span></div>
@@ -247,7 +251,7 @@ function renderTicket(t){
 }
 function stepLine(s,i){
   const row=(k,cls,txt,r)=>`<li><span class="n">${i}</span><span><span class="k ${cls}">${k}</span>${txt}${r?` <span class="r">· ${esc(r)}</span>`:''}</span></li>`;
-  if(s.action==='search') return row('search','search',`“${esc(s.query)}” → ${s.ids.map(x=>'#'+x).join(' ')}`);
+  if(s.action==='search'){const q=s.query.length>80?s.query.slice(0,78).trimEnd()+'…':s.query; return row('search','search',`“${esc(q)}” → ${s.ids.map(x=>'#'+x).join(' ')}`);}
   if(s.action==='decide'&&s.error) return row('error','error',`decision call failed: ${esc(s.error)}`);
   if(s.action==='decide'&&s.next==='search') return row('decide','decide',`not enough → search again: “${esc(s.query)}”`,s.reason);
   if(s.action==='decide') return row('decide','answer',`enough to reply`,s.reason);
@@ -264,28 +268,33 @@ function handle(id){
   ES=new EventSource(`/inbox/${id}/stream`);
   ES.addEventListener('step',e=>{steps.push(JSON.parse(e.data));renderTrace(steps,false);});
   ES.addEventListener('done',e=>{ ES.close(); ES=null; const d=JSON.parse(e.data);
-    if(d.error){t.status='error';renderInbox();renderTicket(t);$('#outcome').innerHTML=`<div class="out"><span class="pill er">ERROR</span><div class="why err">${esc(d.error)}</div></div>`;return;}
+    if(d.error){QUEUE=[];t.status='error';renderInbox();renderTicket(t);$('#outcome').innerHTML=`<div class="out"><span class="pill er">Error</span><div class="why err">${esc(d.error)}</div><div class="actions"><button class="btn pri sm" onclick="reopen(${t.id},true)">Retry</button></div></div>`;return;}
+    if(d.result&&d.result.status==='error'){QUEUE=[];}
     RESULT[id]=d.result; Object.assign(t,d.ticket); SESSION=d.session; renderInbox(); renderTicket(t); renderTrace(d.result.steps,true); renderOutcome(t,d.result);
     if(QUEUE.length) setTimeout(runNext,400); });
-  ES.onerror=()=>{ if(ES){ES.close();ES=null;} t.status='error'; renderInbox(); renderTicket(t); $('#outcome').innerHTML=`<div class="out"><span class="pill er">CONNECTION LOST</span><div class="why">Retry.</div></div>`; };
+  ES.onerror=async()=>{ if(ES){ES.close();ES=null;} QUEUE=[];
+    let why='The stream dropped before the agent finished.';
+    try{const r=await fetch('/inbox');const d=await r.json();const tt=(d.tickets||[]).find(x=>x.id===id);if(tt){Object.assign(t,tt);SESSION=d.session;}}catch(e){}
+    if(t.status==='handling'||t.status==='new'){t.status='error';}
+    renderInbox(); renderTicket(t); $('#outcome').innerHTML=`<div class="out"><span class="pill er">Could not run</span><div class="why">${esc(why)} The server may be busy (rate limit) or restarting. Retry in a moment.</div><div class="actions"><button class="btn pri sm" onclick="reopen(${t.id},true)">Retry</button></div></div>`; };
 }
 function confHTML(d){ const p=Math.round(d.confidence*100),t=Math.round(d.threshold*100);
-  return `<div class="lbl">Confidence</div><div class="bar"><div class="fill" style="width:${p}%"></div><div class="tau" style="left:${t}%"></div></div>
-    <div class="confrow"><span>${d.votes_total?`${d.votes}/${d.votes_total} drafts found an answer · ${(d.confidence*100).toFixed(0)}% agree`:`${(d.confidence*100).toFixed(0)}%`}</span><span>threshold ${d.threshold.toFixed(2)}</span></div>`; }
+  return `<div class="lbl">Confidence</div><div class="bar"><div class="fill" style="width:${p}%"></div>${t>0?`<div class="tau" style="left:${t}%"></div>`:''}</div>
+    <div class="confrow"><span>${d.votes_total?`${d.votes}/${d.votes_total} drafts found an answer · ${(d.confidence*100).toFixed(0)}% agree`:`${(d.confidence*100).toFixed(0)}%`}</span><span>${d.threshold>0?`threshold ${d.threshold.toFixed(2)}`:'threshold 0.00 · any supported answer passes'}</span></div>`; }
 function renderOutcome(t,d){
   let h='';
   if(d.status==='resolved'){ const sent=t.status==='sent';
     h=`<div class="out"><span class="pill ok">${sent?'Reply sent':'Resolved · reply ready'}</span>
-      <div class="bubble"><div class="who">Reply</div>${esc(d.reply)}<button class="copy" onclick="navigator.clipboard&&navigator.clipboard.writeText(${JSON.stringify(d.reply)});this.textContent='copied'">copy</button></div>
+      <div class="bubble"><div class="who">Reply</div>${esc(d.reply)}<button class="copy" onclick="copyText(${t.id},'reply',this)">copy</button></div>
       <div class="actions">${sent?'':`<button class="btn ok" onclick="send(${t.id})">Send reply</button><button class="btn warn" onclick="escalate(${t.id})">Escalate instead</button>`}</div>`+confHTML(d)+
-      (d.citation?`<div class="lbl">Source</div><div class="cite"><div class="ct"><b>#${d.citation.id}</b> ${esc(d.citation.title)} · ${esc(d.citation.category)} · <a href="#" onclick="jump(${d.citation.id});return false">open</a></div>${esc(d.citation.text)}</div>`:'');
+      (d.citation?`<div class="lbl">Source</div><div class="cite"><div class="ct"><b>#${d.citation.id}</b> ${esc(d.citation.title)} · ${esc(d.citation.category)} · <a href="#" onclick="jump(${d.citation.id});return false">open</a></div><div class="tx">${esc(d.citation.text)}</div><div class="more" onclick="this.parentNode.classList.toggle('open');this.textContent=this.parentNode.classList.contains('open')?'less':'more'">more</div></div>`:'');
     markKB(d.retrieved,d.citation?d.citation.id:null);
   }else if(d.status==='escalated'){ const ho=d.handoff||{};
     h=`<div class="out"><span class="pill ab">Escalated to a human</span><div class="why"><b>${esc(d.reason_title)}.</b> ${esc(d.reason)}</div>
       <div class="lbl">Hand-off note</div><div class="hand"><dl><dt>Searched</dt><dd>${(ho.searched||[]).map(s=>`“${esc(s)}”`).join(' · ')||'—'}</dd>
         <dt>Closest articles</dt><dd>${(ho.closest||[]).map(c=>`<a href="#" onclick="jump(${c.id});return false">${esc(c.title)}</a>`).join(' · ')||'none'}</dd>
         <dt>Next step</dt><dd>${esc(ho.suggested_action||'')}</dd></dl></div>
-      <div class="bubble hold"><div class="who">Holding reply</div>${esc(ho.holding_reply||'')}<button class="copy" onclick="navigator.clipboard&&navigator.clipboard.writeText(${JSON.stringify(ho.holding_reply||'')});this.textContent='copied'">copy</button></div>`+
+      <div class="bubble hold"><div class="who">Holding reply</div>${esc(ho.holding_reply||'')}<button class="copy" onclick="copyText(${t.id},'holding',this)">copy</button></div>`+
       (d.reason_code!=='not_in_documents'?confHTML(d):'');
     markKB(d.retrieved,null);
   }else{
@@ -296,20 +305,26 @@ function renderOutcome(t,d){
     <div class="cmp"><button class="btn sm" onclick="compare(${t.id})">Compare with a plain chatbot</button><div class="o" id="cmpOut"></div></div></div>`;
   $('#outcome').innerHTML=h;
 }
-async function post(url,body){const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body||{})});return r.json();}
-async function send(id){const d=await post(`/inbox/${id}/send`); if(d.ticket){Object.assign(TICKETS.find(x=>x.id===id),d.ticket);SESSION=d.session;renderInbox();select(id);}}
-async function escalate(id){const d=await post(`/inbox/${id}/escalate`); if(d.ticket){const t=TICKETS.find(x=>x.id===id);Object.assign(t,d.ticket);SESSION=d.session;renderInbox();renderTicket(t);renderTrace(RESULT[id]?RESULT[id].steps:[],true);
+function copyText(id,kind,btn){const r=RESULT[id]||{}; const txt=kind==='reply'?r.reply:((r.handoff||{}).holding_reply||'');
+  if(navigator.clipboard&&txt){navigator.clipboard.writeText(txt).then(()=>{btn.textContent='copied';setTimeout(()=>btn.textContent='copy',1500);});}}
+async function post(url,body){const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body||{})});const d=await r.json().catch(()=>({error:'bad response'}));if(!r.ok){d.error=d.error||('HTTP '+r.status);} return d;}
+function toast(msg){let el=$('#toast');if(!el){el=document.createElement('div');el.id='toast';el.className='toast';document.body.appendChild(el);}el.textContent=msg;el.classList.add('show');clearTimeout(el._t);el._t=setTimeout(()=>el.classList.remove('show'),3500);}
+async function send(id){const d=await post(`/inbox/${id}/send`); if(d.error){toast(d.error);return;} Object.assign(TICKETS.find(x=>x.id===id),d.ticket);SESSION=d.session;renderInbox();select(id);}
+async function escalate(id){const d=await post(`/inbox/${id}/escalate`); if(d.error){toast(d.error);return;} if(d.ticket){const t=TICKETS.find(x=>x.id===id);Object.assign(t,d.ticket);SESSION=d.session;renderInbox();renderTicket(t);renderTrace(RESULT[id]?RESULT[id].steps:[],true);
   $('#outcome').innerHTML=`<div class="out"><span class="pill ab">Escalated by you</span><div class="why">Sent to the human queue with the agent's trace attached.</div></div>`;}}
-async function reopen(id,run){const d=await post(`/inbox/${id}/reopen`); if(d.ticket){const t=TICKETS.find(x=>x.id===id);Object.assign(t,d.ticket);SESSION=d.session;renderInbox(); if(run!==false) handle(id);}}
+async function reopen(id,run){const d=await post(`/inbox/${id}/reopen`); if(d.error){toast(d.error);return;} if(d.ticket){const t=TICKETS.find(x=>x.id===id);Object.assign(t,d.ticket);SESSION=d.session;renderInbox(); if(run!==false) handle(id);}}
 async function compare(id){ const out=$('#cmpOut'); out.classList.add('show'); const t=TICKETS.find(x=>x.id===id);
   out.innerHTML=`<div class="box bad"><h4>Plain chatbot · same model, no help centre</h4>…</div><div class="box"><h4>This agent</h4>see above</div>`;
   const d=await post('/compare',{message:t.message});
+  if(d.error&&!d.reply){out.innerHTML=`<div class="box bad"><h4>Plain chatbot</h4><span class="err">${esc(d.error)}</span></div><div class="box"><h4>This agent</h4>see above</div>`;return;}
   out.innerHTML=`<div class="box bad"><h4>Plain chatbot · same model, no help centre</h4>${d.error?`<span class="err">${esc(d.error)}</span>`:esc(d.reply)}</div>
     <div class="box"><h4>This agent</h4>${d.error?'':(RESULT[id].status==='resolved'?'Replied from a cited article.':'Escalated: the help centre does not cover this. '+esc(META.company)+' is fictional, so anything the chatbot stated was invented.')}</div>`; }
 
 /* compose + run-all */
 $('#cAdd').onclick=async()=>{ const msg=$('#cMsg').value.trim(); if(!msg||ES) return;
+  if(META.limits&&msg.length>META.limits.max_message_chars){toast(`Message is too long (limit ${META.limits.max_message_chars} characters).`);return;}
   const d=await post('/inbox',{message:msg,customer:$('#cName').value.trim(),subject:$('#cSubj').value.trim()});
+  if(d.error){toast(d.error);return;}
   TICKETS.unshift(d.ticket); SESSION=d.session; $('#cMsg').value='';$('#cSubj').value='';$('#cName').value=''; renderInbox(); select(d.ticket.id); };
 $('#runAll').onclick=()=>{ if(ES) return; QUEUE=TICKETS.filter(t=>t.status==='new').map(t=>t.id).reverse(); runNext(); };
 function runNext(){ const id=QUEUE.shift(); if(id===undefined) return; SEL=id; renderInbox(); const t=TICKETS.find(x=>x.id===id); renderTicket(t); handle(id); }

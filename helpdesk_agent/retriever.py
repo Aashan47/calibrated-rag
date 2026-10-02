@@ -54,7 +54,9 @@ class TfidfRetriever:
             dot = sum(v * vec.get(w, 0.0) for w, v in q.items())
             scores.append((dot / (qn * self.norms[i]), i))
         scores.sort(reverse=True)
-        return [i for _, i in scores]
+        # a document that shares no term with the query is not a match, however short the
+        # list gets; returning it would hand the agent irrelevant passages to "judge"
+        return [i for sc, i in scores if sc > 0]
 
     def search(self, query: str, k: int = 3) -> list[int]:
         return self.ranked(query)[:k]
