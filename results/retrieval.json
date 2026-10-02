@@ -1,0 +1,15 @@
+{
+  "n_questions": 300,
+  "n_passages": 32,
+  "hybrid_mode": "hybrid",
+  "lexical_tfidf": {
+    "recall@1": 0.9367,
+    "recall@3": 0.9833,
+    "recall@5": 0.9933
+  },
+  "hybrid": {
+    "recall@1": 0.96,
+    "recall@3": 0.9933,
+    "recall@5": 0.9967
+  }
+}

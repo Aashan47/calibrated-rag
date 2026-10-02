@@ -1,0 +1,2 @@
+# This project is pure Python standard library. No third-party packages required.
+# Python 3.10+

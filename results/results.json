@@ -1,0 +1,36 @@
+{
+  "model": "gemini-2.5-flash",
+  "dataset": "SQuAD 2.0 (dev slice)",
+  "n_questions": 300,
+  "n_unanswerable": 140,
+  "n_passages": 32,
+  "retrieval_k": 3,
+  "alpha_target_error": 0.2,
+  "calibrated_threshold": 1.0,
+  "ece": 0.1723,
+  "ece_selfconsistency": 0.1723,
+  "ece_selfreported": 0.2635,
+  "naive_always_answer": {
+    "coverage": 1.0,
+    "selective_accuracy": 0.4111111111111111,
+    "hallucination_rate_unanswerable": 1.0,
+    "task_accuracy": 0.4111111111111111,
+    "answered": 180
+  },
+  "uncalibrated_trust_model": {
+    "coverage": 0.5555555555555556,
+    "selective_accuracy": 0.72,
+    "hallucination_rate_unanswerable": 0.1797752808988764,
+    "task_accuracy": 0.8055555555555556,
+    "answered": 100
+  },
+  "calibrated_abstention": {
+    "coverage": 0.37222222222222223,
+    "selective_accuracy": 0.8656716417910447,
+    "hallucination_rate_unanswerable": 0.06741573033707865,
+    "task_accuracy": 0.7833333333333333,
+    "answered": 67
+  },
+  "test_selective_error_at_threshold": 0.1343,
+  "guarantee_held": true
+}
