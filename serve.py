@@ -25,23 +25,44 @@ _TAU = corpus.abstention_threshold(_CUSTOM)
 print(f"Ready: {len(_CONTEXTS)} passages from {_SOURCE}; abstention threshold = {_TAU:.2f}")
 
 
+def _format_steps(steps: list[dict]) -> list[str]:
+    """Turn the agent's raw action log into short human-readable lines for the UI."""
+    out = []
+    for s in steps or []:
+        a = s.get("action")
+        if a == "search":
+            out.append(f"🔎 searched “{s.get('query','')}” "
+                       f"→ {s.get('new', 0)} new passage(s)")
+        elif a == "decide":
+            if s.get("next") == "search":
+                out.append(f"🤔 passages insufficient → reformulating: “{s.get('query','')}”")
+            else:
+                out.append("✅ judged passages sufficient → answering")
+        elif a == "abstain":
+            out.append("🛑 judged the answer isn't in this corpus → abstaining")
+    return out
+
+
 def _answer(question: str) -> dict:
     t0 = time.time()
     pred = _AGENT.predict(question)
     d = agent_mod.decide(pred, _TAU)
+    steps = pred.get("steps", [])
     trace.log({"q": question[:200], "answered": d["answered"],
                "confidence": round(d["confidence"], 2),
+               "steps": len([s for s in steps if s.get("action") == "search"]),
                "latency_ms": round((time.time() - t0) * 1000)})
     reason = ""
     if not d["answered"]:
-        reason = ("the model judged it unanswerable from these documents"
+        reason = ("the agent judged it unanswerable from these documents"
                   if not pred.get("answerable")
                   else f"confidence {pred.get('confidence', 0):.2f} is below the calibrated "
                        f"threshold of {_TAU:.2f}")
     cite = d.get("citation")
     return {"answered": d["answered"], "answer": d["answer"],
             "confidence": round(d["confidence"], 2), "threshold": round(_TAU, 2),
-            "reason": reason, "citation": (cite or {}).get("text", "") if cite else ""}
+            "reason": reason, "citation": (cite or {}).get("text", "") if cite else "",
+            "trace": _format_steps(steps)}
 
 
 PAGE = """<!doctype html><html lang=en><head><meta charset=utf-8>
@@ -71,6 +92,9 @@ padding:5px 12px;cursor:pointer;background:transparent}.chip:hover{color:var(--i
 .meta{font-size:13px;color:var(--mut)}
 .cite{margin-top:14px;padding:12px 14px;border-left:3px solid var(--accent);background:#0d151e;
 border-radius:6px;font-size:13.5px;color:#c9d6e2;max-height:150px;overflow:auto}
+.trace{margin-top:14px;padding:12px 14px;background:#0d151e;border-radius:8px;font-size:13px;
+color:var(--mut);border:1px solid var(--line)}
+.trace .lbl{margin-bottom:6px}.trace ol{margin:0;padding-left:18px}.trace li{margin:3px 0}
 .pill{display:inline-block;font-size:12px;font-weight:600;padding:3px 10px;border-radius:20px}
 .pill.ok{background:rgba(67,214,160,.14);color:var(--ok)}
 .pill.ab{background:rgba(240,182,75,.14);color:var(--warn)}
@@ -93,7 +117,7 @@ c.onclick=()=>{document.getElementById('q').value=e;ask()};chips.appendChild(c)}
 async function ask(){
  const q=document.getElementById('q').value.trim(); if(!q)return;
  const go=document.getElementById('go'),card=document.getElementById('card');
- go.disabled=true;card.style.display='block';card.innerHTML='<span class=meta>thinking (sampling for self-consistency)...</span>';
+ go.disabled=true;card.style.display='block';card.innerHTML='<span class=meta>agent working (searching, judging, then self-consistency sampling)...</span>';
  try{
   const r=await fetch('/ask',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({question:q})});
   const d=await r.json(); render(d);
@@ -101,6 +125,11 @@ async function ask(){
  go.disabled=false;
 }
 function esc(s){return (s||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))}
+function traceHTML(t){
+ if(!t||!t.length)return '';
+ return `<div class=trace><div class=lbl>agent trace</div><ol>`+
+   t.map(s=>`<li>${esc(s)}</li>`).join('')+`</ol></div>`;
+}
 function render(d){
  const card=document.getElementById('card'); const pct=Math.round(d.confidence*100);
  if(d.answered){
@@ -108,11 +137,13 @@ function render(d){
    <div class=ans>${esc(d.answer)}</div>
    <div class=bar><div class=fill style="width:${pct}%"></div></div>
    <div class=meta>confidence ${d.confidence.toFixed(2)} &nbsp;·&nbsp; calibrated threshold ${d.threshold.toFixed(2)}</div>
-   ${d.citation?`<div class=lbl style="margin-top:14px">cited passage</div><div class=cite>${esc(d.citation)}</div>`:''}`;
+   ${d.citation?`<div class=lbl style="margin-top:14px">cited passage</div><div class=cite>${esc(d.citation)}</div>`:''}
+   ${traceHTML(d.trace)}`;
  }else{
   card.innerHTML=`<span class="pill ab">ABSTAINED</span>
    <div class=ans style="font-size:17px">I can't answer this reliably from the documents.</div>
-   <div class=meta>reason: ${esc(d.reason)}</div>`;
+   <div class=meta>reason: ${esc(d.reason)}</div>
+   ${traceHTML(d.trace)}`;
  }
 }
 fetch('/meta').then(r=>r.json()).then(m=>{document.getElementById('foot').textContent=

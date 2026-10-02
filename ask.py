@@ -18,6 +18,10 @@ from calibrated_rag import corpus
 def answer(agent, tau, question):
     pred = agent.predict(question)
     d = agent_mod.decide(pred, tau)
+    searches = [s for s in pred.get("steps", []) if s.get("action") == "search"]
+    if len(searches) > 1:   # the agent reformulated and searched again
+        print(f"  (agent ran {len(searches)} searches: "
+              + " | ".join(s.get("query", "") for s in searches) + ")")
     if d["answered"]:
         print(f"\n  ANSWER: {d['answer']}")
         print(f"  confidence: {d['confidence']:.2f}  (>= calibrated threshold {tau:.2f})")
@@ -25,7 +29,7 @@ def answer(agent, tau, question):
             snippet = d["citation"]["text"][:240].replace("\n", " ")
             print(f"  cited passage: {snippet}...")
     else:
-        why = "the model judged it unanswerable" if not pred.get("answerable") \
+        why = "the agent judged it unanswerable" if not pred.get("answerable") \
             else f"confidence {pred.get('confidence',0):.2f} < calibrated threshold {tau:.2f}"
         print("\n  ABSTAINED: I can't answer this reliably from the documents.")
         print(f"  reason: {why}")

@@ -5,8 +5,9 @@
 
 import unittest
 
-from calibrated_rag import conformal, embeddings, metrics
-from calibrated_rag.agent import _aggregate
+from calibrated_rag import conformal, embeddings, llm, metrics
+from calibrated_rag import agent as agent_mod
+from calibrated_rag.agent import Agent, _aggregate
 from calibrated_rag.retriever import HybridRetriever, TfidfRetriever
 
 
@@ -93,6 +94,66 @@ class TestAggregate(unittest.TestCase):
         agg = _aggregate(samples, 5)
         self.assertFalse(agg["answerable"])
         self.assertEqual(agg["confidence"], 0.0)
+
+
+class TestAgentLoop(unittest.TestCase):
+    """The agent's decision loop (offline: stub the two LLM calls)."""
+
+    DOCS = ["the cat sat on the mat",
+            "quarterly revenue grew twenty percent last year",
+            "photosynthesis converts light into chemical energy"]
+
+    def _agent(self):
+        return Agent(self.DOCS, k=1, n_samples=2, retriever="tfidf")
+
+    def _patch(self, decisions, answerable=True, answer="twenty percent"):
+        """Stub llm.decide-sequence (via complete) and the final answer sampling."""
+        self._decs = list(decisions)
+        def fake_complete(prompt, **kw):
+            return self._decs.pop(0) if self._decs else '{"action":"answer"}'
+        def fake_answer(q, ctx, temperature=0.0):
+            return {"answerable": answerable, "answer": answer if answerable else "",
+                    "cite": 1, "confidence": 1.0 if answerable else 0.0}
+        self._orig = (llm.complete, llm.answer_or_abstain)
+        llm.complete = fake_complete
+        agent_mod.llm.answer_or_abstain = fake_answer
+        llm.answer_or_abstain = fake_answer
+
+    def tearDown(self):
+        if hasattr(self, "_orig"):
+            llm.complete, llm.answer_or_abstain = self._orig
+            agent_mod.llm.answer_or_abstain = self._orig[1]
+
+    def test_answers_immediately_when_passages_sufficient(self):
+        self._patch(['{"action":"answer","reason":"found it"}'])
+        p = self._agent().predict("how much did revenue grow")
+        self.assertTrue(p["answerable"])
+        self.assertEqual(p["answer"], "twenty percent")
+        searches = [s for s in p["steps"] if s["action"] == "search"]
+        self.assertEqual(len(searches), 1)        # only the seed search
+
+    def test_reformulates_and_searches_again(self):
+        # first decision: search with a new query; second: answer
+        self._patch(['{"action":"search","query":"company earnings growth"}',
+                     '{"action":"answer"}'])
+        p = self._agent().predict("how did the business do")
+        searches = [s for s in p["steps"] if s["action"] == "search"]
+        self.assertEqual(len(searches), 2)        # seed + one reformulation
+        self.assertTrue(p["answerable"])
+
+    def test_abstains_when_agent_gives_up(self):
+        self._patch(['{"action":"abstain","reason":"not in corpus"}'])
+        p = self._agent().predict("who is the president of mars")
+        self.assertFalse(p["answerable"])
+        self.assertEqual(p["confidence"], 0.0)
+        self.assertTrue(any(s["action"] == "abstain" for s in p["steps"]))
+
+    def test_does_not_repeat_a_tried_query(self):
+        # agent keeps proposing the SAME query; loop must stop and answer, not spin
+        self._patch(['{"action":"search","query":"how much did revenue grow"}'] * 5)
+        p = self._agent().predict("how much did revenue grow")
+        searches = [s for s in p["steps"] if s["action"] == "search"]
+        self.assertEqual(len(searches), 1)        # duplicate query rejected → no re-search
 
 
 if __name__ == "__main__":

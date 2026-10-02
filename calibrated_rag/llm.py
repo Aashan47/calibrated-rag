@@ -49,6 +49,14 @@ def _generate(prompt: str, max_tokens: int = 256, temperature: float = 0.0) -> s
     raise last if last else RuntimeError("generation failed")
 
 
+def complete(prompt: str, max_tokens: int = 256, temperature: float = 0.0) -> str:
+    """Generic text completion (used by the agent's decision step). '' on failure."""
+    try:
+        return _generate(prompt, max_tokens=max_tokens, temperature=temperature)
+    except Exception:  # noqa: BLE001
+        return ""
+
+
 _PROMPT = """You are a careful question-answering assistant. Answer the QUESTION using ONLY \
 the numbered PASSAGES below. If the passages do not contain enough information to answer, do \
 not guess — mark it unanswerable.

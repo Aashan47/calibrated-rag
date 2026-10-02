@@ -5,25 +5,31 @@
 ![dependencies](https://img.shields.io/badge/dependencies-zero-brightgreen)
 ![license](https://img.shields.io/badge/license-MIT-green)
 
-**A retrieval-QA agent that knows when to abstain — with a conformal-calibrated confidence.**
+**A retrieval agent that decides its own search strategy — and knows when to abstain, with a
+conformal-calibrated confidence.**
 
-Most RAG systems answer every question, which means they confidently hallucinate on the ones
-they can't actually support. In production that's the whole problem: you can't deploy an agent
-you can't trust. `calibrated-rag` adds the missing piece — it **abstains instead of guessing**,
-and its decision to answer is governed by a confidence threshold **calibrated with split-conformal
-selective prediction**, so *when it answers, it's right at a target rate you set.*
+Most RAG systems run a fixed path (retrieve once → answer) and answer *every* question, so they
+confidently hallucinate on the ones they can't actually support. In production that's the whole
+problem: you can't deploy an agent you can't trust. `calibrated-rag` fixes both halves. It's a real
+**agent** — a bounded decision loop where the LLM uses a search tool, judges whether the passages
+actually answer the question, **reformulates and searches again** when they don't, and decides for
+itself whether to answer or give up. And when it does answer, that decision is governed by a
+confidence threshold **calibrated with split-conformal selective prediction**, so *when it answers,
+it's right at a target rate you set.*
 
 Evaluated on **SQuAD 2.0** (which deliberately includes unanswerable questions), measuring not just
 accuracy but **calibration, hallucination rate, and the accuracy/coverage tradeoff.**
 
+- 🔁 **Agentic decision loop** — the LLM chooses to search / reformulate / answer / abstain each step, not a fixed pipeline
+- 🛠️ **Tool use** — a `search` tool the agent calls with its own (re)formulated queries
 - 🧠 **Self-consistency confidence** (agreement across samples), not the LLM's miscalibrated "100%"
 - 📉 **Conformal abstention** with a risk target — a reliability guarantee on answered questions
 - 🔎 **Citations** — every answer points to the passage that supports it
 - 🔀 **Hybrid retrieval** — TF-IDF + Gemini embeddings fused with Reciprocal Rank Fusion (lexical fallback)
-- 🖥️ **Web demo + CLI** — ask in the browser and watch it answer or abstain (`serve.py`)
+- 🖥️ **Web demo + CLI** — ask in the browser and watch the agent's trace, then answer or abstain (`serve.py`)
 - 📁 **Bring your own docs** — index a folder and query it, not just the benchmark (`ingest.py`)
 - 📊 **Measured, not claimed** — selective accuracy, ECE, hallucination reduction, accuracy-vs-coverage
-- ✅ **Tested + CI** — offline unit tests run in GitHub Actions
+- ✅ **Tested + CI** — offline unit tests (incl. the agent loop) run in GitHub Actions
 - 🪶 **Zero dependencies** — pure Python stdlib (retrieval, charts, HTTP server, API client)
 
 ---
@@ -35,25 +41,25 @@ SQuAD 2.0 dev slice — **300 questions** (140 unanswerable) over 32 passages, m
 
 | | Naive RAG (answers all) | + model self-check | **+ conformal dial** |
 |---|---:|---:|---:|
-| **Hallucination rate on unanswerable Qs** | 100% | 18.0% | **6.7%** |
-| **Accuracy on answered questions** | 41% | 72.0% | **86.6%** |
-| Task accuracy (answer correctly *or* abstain) | 41% | 80.6% | 78.3% |
-| Coverage (fraction answered) | 100% | 56% | 37% |
+| **Hallucination rate on unanswerable Qs** | 100% | 15.7% | **10.1%** |
+| **Accuracy on answered questions** | 42% | 76.5% | **83.1%** |
+| Task accuracy (answer correctly *or* abstain) | 42% | 83.3% | 77.2% |
+| Coverage (fraction answered) | 100% | 54% | 39% |
 
 Two things to read here:
 
 1. **Abstention is the whole game.** A vanilla RAG that always answers hallucinates on *every*
-   unanswerable question (100%) and lands at 41% task accuracy. Letting the agent say "I can't
-   answer this" takes task accuracy to 81%.
+   unanswerable question (100%) and lands at 42% task accuracy. Letting the agent say "I can't
+   answer this" takes task accuracy to 83%.
 2. **The conformal layer adds a tunable *guarantee* on top.** Set a target error α; it calibrates
    the confidence threshold on held-out data so accuracy on answered questions clears it — verified
-   on a disjoint test split (**13.4% error ≤ 20% target**). It lifts answered-accuracy from 72% to
-   **87%** and cuts the hallucination rate on unanswerable questions by nearly two-thirds (18% →
-   **7%**), at a coverage cost. A naive RAG gives you no such dial.
+   on a disjoint test split (**16.9% error ≤ 20% target**). It lifts answered-accuracy from 77% to
+   **83%** and cuts the hallucination rate on unanswerable questions by a third (16% → **10%**), at a
+   coverage cost. A naive RAG gives you no such dial.
 
 **Calibration ablation — the confidence signal matters.** With the same model, the *raw
-self-reported* confidence gives ECE **0.263**; **self-consistency** (agreement across samples) gives
-ECE **0.172**. A better-calibrated signal is what makes the abstention threshold trustworthy.
+self-reported* confidence gives ECE **0.231**; **self-consistency** (agreement across samples) gives
+ECE **0.158**. A better-calibrated signal is what makes the abstention threshold trustworthy.
 
 <p>
 <img src="results/reliability.svg" width="440" alt="Reliability diagram">
@@ -83,26 +89,39 @@ noisier document sets. `CRAG_RETRIEVER=tfidf` forces lexical-only.
 
 ## How it works
 
+It's an **agent**, not a fixed pipeline: at each step the LLM looks at what it has retrieved and
+**chooses its next action** — search again with a reformulated query, answer now, or abstain —
+instead of running a hard-coded retrieve→answer path. The loop is bounded so it always terminates,
+and the final answer still faces the calibrated confidence gate.
+
 ```
 question
    │
    ▼
-[1] Retrieve        TF-IDF over the passage corpus → top-k passages
-   │
+ ┌─────────────────────────────  agent loop (bounded)  ─────────────────────────────┐
+ │  search(query)        tool call → top-k passages added to working context        │
+ │       │                                                                           │
+ │       ▼                                                                           │
+ │  decide  ── the LLM judges the gathered passages and picks the next action: ──┐   │
+ │       │        • answer   → passages are sufficient, go answer                │   │
+ │       │        • search   → insufficient; reformulate the query and loop ◀────┘   │
+ │       │        • abstain  → answer isn't in this corpus; stop                     │
+ └───────┼───────────────────────────────────────────────────────────────────────┘
+         ▼  (answer)
+[A] Self-consistency   the model answers from ONLY the gathered passages, N times
+   │                   concurrently; confidence = agreement across the N samples
    ▼
-[2] Answer-or-abstain   the model answers from ONLY those passages, or says it can't
-   │                    (sampled N times, concurrently)
+[B] Conformal gate     calibrated threshold τ (target error α on a held-out split):
+   │                   answer iff confidence ≥ τ, else abstain
    ▼
-[3] Confidence      self-consistency: agreement across the N samples on the top answer
-   │
-   ▼
-[4] Decide          conformal threshold τ (calibrated for a target error on a held-out
-   │                 split) decides: answer (conf ≥ τ) or abstain
-   ▼
-answer + citations-worth of context + confidence     OR     "I can't answer this reliably"
+answer + cited passage + confidence     OR     "I can't answer this reliably"
 ```
 
-**The core idea (step 4).** A single LLM confidence is poorly calibrated — the model says it's
+**Two ways it abstains.** The agent can *decide* the corpus can't support an answer (step `abstain`
+in the loop), and — independently — the self-consistency confidence can fall below the calibrated
+threshold (step B). Both protect against confident nonsense.
+
+**The core idea (step B).** A single LLM confidence is poorly calibrated — the model says it's
 certain even when it's wrong. So confidence here is *self-consistency*: ask several times, measure
 agreement. Then, instead of picking a threshold by hand, we **calibrate** it: on a held-out split
 we find the lowest confidence threshold whose empirical error among answered questions is ≤ α, and
@@ -158,10 +177,11 @@ while still abstaining on unanswerable questions.
 
 ```
 calibrated_rag/
-  llm.py          # model-agnostic answer-or-abstain client (stdlib urllib)
+  agent.py        # the agent: bounded decision loop (search/reformulate/answer/abstain) + self-consistency
+  tools.py        # tools the agent can call (search over the corpus); extensible
+  llm.py          # model-agnostic answer-or-abstain + decision client (stdlib urllib)
   embeddings.py   # Gemini embeddings with on-disk cache + graceful fallback
   retriever.py    # TF-IDF + hybrid (RRF of lexical + dense) retrieval
-  agent.py        # retrieve → N concurrent samples → self-consistency confidence + citation
   conformal.py    # split-conformal selective-prediction threshold
   metrics.py      # SQuAD EM/F1, ECE, reliability bins
   charts.py       # hand-written SVG reliability + coverage charts
@@ -195,8 +215,12 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for the design decisions and extension po
   right number *for that benchmark*. On your own documents there's no labeled data to calibrate
   against, so `ingest` mode uses a sensible default (answer when ≥ 3/5 samples agree); override with
   `CRAG_THRESHOLD=0.x`, or supply a labeled Q&A set to get a real guarantee for your corpus.
-- **Scope is intentionally tight** (one corpus, read-only QA) so the contribution — *calibrated
-  abstention* — is the thing that's done well.
+- **The agent loop is bounded and costs calls.** It adds one decision call per step (default ≤ 3
+  steps, `CRAG_MAX_STEPS`) on top of the N answer samples, and refuses to repeat a query so it can't
+  spin. On a small, clean corpus the first retrieval is usually enough, so the reformulation earns
+  its keep mainly on larger/noisier document sets where the first query misses.
+- **Scope is intentionally tight** (one corpus, read-only QA) so the contributions — *an agent that
+  directs its own retrieval* and *calibrated abstention* — are the things done well.
 
 ---
 

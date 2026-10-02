@@ -1,27 +1,45 @@
 # Architecture
 
-## The pipeline
+## Agent, not pipeline
+
+The control flow is **decided by the LLM at run time**, not hard-coded. Each step the agent looks at
+what it has gathered and chooses the next action — search again (with a reformulated query), answer,
+or abstain. State (gathered passages, queries tried) carries across steps; the loop is bounded
+(`CRAG_MAX_STEPS`, default 3) so it always terminates. When it chooses to answer, the answer goes
+through a self-consistency confidence and a calibrated conformal gate.
 
 ```
 question
    │
+   ▼  seed: search(question)
+┌── loop (≤ max_steps) ─────────────────────────────────────────────────────────────┐
+│  _decide (llm.py)   the LLM reads the gathered passages and returns an action:      │
+│      • search  →  tools.py SearchTool(query'): reformulated query, add new passages │
+│      • answer  →  break out of the loop and answer                                  │
+│      • abstain →  stop; the answer isn't in this corpus                             │
+└─────────────────────────────────────────────────────────────────────────────────┘
+   │  (answer)
    ▼
-[1] Retrieve          retriever.py   hybrid: TF-IDF + embeddings fused with RRF → top-k (numbered)
-   │
+[A] Self-consistency  agent.py   answer from ONLY gathered passages, N times concurrently;
+   │                             confidence = agreement across samples; cite the support
    ▼
-[2] Answer-or-abstain llm.py         the model answers from ONLY those passages (or says it
-   │                                 can't), cites the supporting passage, N times concurrently
-   ▼
-[3] Aggregate         agent.py       self-consistency: confidence = agreement across samples;
-   │                                 citation = the passage the agreeing samples pointed to
-   ▼
-[4] Decide            conformal.py   answer iff answerable AND confidence ≥ τ, where τ is a
-   │                                 threshold calibrated for a target error on held-out data
+[B] Conformal gate    conformal.py  answer iff answerable AND confidence ≥ τ, where τ is a
+   │                                threshold calibrated for a target error on held-out data
    ▼
 answer + confidence + citation      OR     abstain ("can't answer this reliably")
 ```
 
+The agent appends a `steps` trace to every prediction (the searches it ran, the decisions it made),
+which `serve.py` and `ask.py` surface so you can see *why* it answered or abstained.
+
 ## Key design decisions
+
+0. **An agent that directs its own retrieval.** A fixed retrieve→answer path fails when the first
+   query retrieves the wrong passages. Letting the LLM judge sufficiency and **reformulate** recovers
+   those cases, and letting it explicitly **abstain** is a first-class action, not just a side effect
+   of a low score. The loop is bounded and refuses to repeat a query it already tried, so it can't
+   spin. Tools live behind a small interface (`tools.py`), so adding a second corpus or a web lookup
+   doesn't touch the loop.
 
 1. **Self-consistency, not self-reported confidence.** A single LLM "I'm 100% sure" is badly
    calibrated. Sampling the answer several times and measuring agreement produces a far better
@@ -45,10 +63,11 @@ answer + confidence + citation      OR     abstain ("can't answer this reliably"
 
 | File | Responsibility |
 |---|---|
+| `calibrated_rag/agent.py` | the agent: bounded decision loop (search/reformulate/answer/abstain) → self-consistency + citation |
+| `calibrated_rag/tools.py` | tools the agent can call (`search` over the corpus); extension point |
 | `calibrated_rag/retriever.py` | lexical (TF-IDF) + hybrid (RRF of TF-IDF + dense) retrieval |
 | `calibrated_rag/embeddings.py` | Gemini embeddings, on-disk cache, graceful fallback |
-| `calibrated_rag/llm.py` | model-agnostic answer-or-abstain client (swap point for Claude/GPT) |
-| `calibrated_rag/agent.py` | retrieve → N concurrent samples → self-consistency + citation |
+| `calibrated_rag/llm.py` | model-agnostic answer-or-abstain + decision client (swap point for Claude/GPT) |
 | `calibrated_rag/conformal.py` | split-conformal selective-prediction threshold |
 | `calibrated_rag/metrics.py` | SQuAD EM/F1, ECE, reliability bins |
 | `calibrated_rag/charts.py` | hand-written SVG reliability + coverage charts |
@@ -61,6 +80,8 @@ answer + confidence + citation      OR     abstain ("can't answer this reliably"
 - **Retrieval:** hybrid (TF-IDF + embeddings, fused with RRF) ships; a cross-encoder reranker is the
   next step and is isolated to `retriever.py`. The rest of the pipeline is agnostic to how passages
   are found.
+- **Tools:** the agent calls tools through `tools.py`; a web lookup, a calculator, or a second
+  corpus would register there and the decision loop could choose them without changing its logic.
 - **Model:** `llm.py` hides the provider behind one function — Claude/GPT is a small change.
 - **Faithfulness:** a verifier step (claim ↔ cited-span entailment) would tighten groundedness
   beyond the current citation + self-consistency.
